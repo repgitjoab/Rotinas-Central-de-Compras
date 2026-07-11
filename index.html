@@ -378,6 +378,7 @@
     <div class="modal-actions" style="flex-direction:column;">
       <button class="btn-salvar" id="menu-nova-tarefa" style="margin-bottom:8px;">➕ Nova tarefa / rotina</button>
       <button class="btn-salvar" id="menu-gestao" style="margin-bottom:8px;">📋 Gestão de rotinas (ver todas)</button>
+      <button class="btn-salvar" id="menu-cancelar-rotinas" style="margin-bottom:8px; background:var(--muted);">🗑 Cancelar rotina cadastrada</button>
       <button class="btn-cancel" id="menu-cancelar">Cancelar</button>
     </div>
   </div>
@@ -398,6 +399,17 @@
       <button class="concluir-btn" id="btn-cobrar-todos" style="background:var(--alta);">📧 Cobrar todos atrasados</button>
     </div>
     <div id="gestao-list"><div class="empty">Carregando...</div></div>
+  </main>
+</div>
+
+<div id="tela-rotinas" style="display:none;">
+  <main style="padding-top:10px;">
+    <div class="section-title" style="margin-bottom:10px;">Rotinas cadastradas</div>
+    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Cancelar não apaga o histórico — a rotina só para de aparecer na agenda diária. Dá pra reativar quando quiser.</p>
+    <div style="margin-bottom:14px;">
+      <button class="concluir-btn" id="btn-atualizar-rotinas">🔄 Atualizar</button>
+    </div>
+    <div id="rotinas-cadastradas-list"><div class="empty">Carregando...</div></div>
   </main>
 </div>
 
@@ -596,6 +608,7 @@ function voltarTelaInicial(){
   document.getElementById('tela-selecao').style.display = 'block';
   document.getElementById('tela-tarefas').style.display = 'none';
   document.getElementById('tela-gestao').style.display = 'none';
+  document.getElementById('tela-rotinas').style.display = 'none';
   document.getElementById('voltar-btn').classList.remove('show');
   document.getElementById('header-titulo').textContent = 'Agenda de Rotinas';
   document.getElementById('header-sub').textContent = 'Central de Compras · Grupo Jorlan';
@@ -605,11 +618,23 @@ document.getElementById('voltar-btn').addEventListener('click', voltarTelaInicia
 function abrirGestao(){
   document.getElementById('tela-selecao').style.display = 'none';
   document.getElementById('tela-tarefas').style.display = 'none';
+  document.getElementById('tela-rotinas').style.display = 'none';
   document.getElementById('tela-gestao').style.display = 'block';
   document.getElementById('voltar-btn').classList.add('show');
   document.getElementById('header-titulo').textContent = 'Gestão de Rotinas';
   document.getElementById('header-sub').textContent = 'Pendências de todos os colaboradores';
   carregarGestao();
+}
+
+function abrirGerenciarRotinas(){
+  document.getElementById('tela-selecao').style.display = 'none';
+  document.getElementById('tela-tarefas').style.display = 'none';
+  document.getElementById('tela-gestao').style.display = 'none';
+  document.getElementById('tela-rotinas').style.display = 'block';
+  document.getElementById('voltar-btn').classList.add('show');
+  document.getElementById('header-titulo').textContent = 'Rotinas Cadastradas';
+  document.getElementById('header-sub').textContent = 'Cancelar ou reativar rotinas diárias';
+  carregarRotinasCadastradas();
 }
 
 async function carregarDados(){
@@ -667,6 +692,10 @@ document.getElementById('menu-nova-tarefa').addEventListener('click', () => {
 document.getElementById('menu-gestao').addEventListener('click', () => {
   gestorMenuOverlay.classList.remove('open');
   abrirGestao();
+});
+document.getElementById('menu-cancelar-rotinas').addEventListener('click', () => {
+  gestorMenuOverlay.classList.remove('open');
+  abrirGerenciarRotinas();
 });
 
 function abrirModal(){
@@ -866,6 +895,72 @@ document.getElementById('btn-cobrar-todos').addEventListener('click', async () =
   btn.disabled = false; btn.textContent = '📧 Cobrar todos atrasados';
   carregarGestao();
 });
+
+// ---------------- Gerenciar rotinas cadastradas ----------------
+async function carregarRotinasCadastradas(){
+  const container = document.getElementById('rotinas-cadastradas-list');
+  container.innerHTML = '<div class="empty">Carregando...</div>';
+  try{
+    const data = await apiGet({ action: 'listarRotinas' });
+    renderRotinasCadastradas(data.rotinas || []);
+  }catch(err){
+    toast('Erro ao carregar rotinas cadastradas.');
+  }
+}
+
+function renderRotinasCadastradas(rotinas){
+  const container = document.getElementById('rotinas-cadastradas-list');
+  if (rotinas.length === 0){
+    container.innerHTML = '<div class="empty">Nenhuma rotina cadastrada ainda.</div>';
+    return;
+  }
+
+  const ordenado = [...rotinas].sort((a,b) => {
+    if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
+    return a.responsavel.localeCompare(b.responsavel, 'pt-BR');
+  });
+
+  container.innerHTML = ordenado.map(r => `
+    <div class="task-card prio-${r.prioridade} ${!r.ativo ? 'concluido' : ''}">
+      <div class="task-info">
+        <p class="task-title">${escapeHtml(r.tarefa)}</p>
+        <div class="task-meta">
+          <span class="badge" style="background:var(--primary);">${escapeHtml(r.responsavel)}</span>
+          <span class="badge ${r.prioridade}">${r.prioridade === 'Media' ? 'Média' : r.prioridade}</span>
+          <span class="prazo">Prazo: ${r.horarioLimite}</span>
+          ${!r.ativo ? '<span class="prazo" style="color:var(--muted);">Cancelada</span>' : ''}
+        </div>
+      </div>
+      ${r.ativo
+        ? `<button class="concluir-btn" style="background:var(--alta);" onclick="alternarStatusRotina('${r.id}', false, this)">Cancelar</button>`
+        : `<button class="concluir-btn" style="background:var(--baixa);" onclick="alternarStatusRotina('${r.id}', true, this)">Reativar</button>`
+      }
+    </div>
+  `).join('');
+}
+
+async function alternarStatusRotina(id, ativar, btn){
+  if (!ativar && !confirm('Cancelar esta rotina? Ela para de aparecer na agenda diária (o histórico é mantido).')) return;
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  try{
+    const res = await apiPost({ action: ativar ? 'reativarRotina' : 'cancelarRotina', id });
+    if (res.ok){
+      toast(ativar ? 'Rotina reativada.' : 'Rotina cancelada.');
+      carregarRotinasCadastradas();
+    }else{
+      toast('Erro: ' + (res.erro || 'não foi possível atualizar'));
+      btn.disabled = false;
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btn-atualizar-rotinas').addEventListener('click', carregarRotinasCadastradas);
+
 
 </script>
 
