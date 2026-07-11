@@ -451,6 +451,30 @@
       </div>
     </div>
 
+    <label style="margin-top:14px;">Dias da semana específicos (opcional)</label>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="editar-dia-seg" value="SEG"> Seg</label>
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="editar-dia-ter" value="TER"> Ter</label>
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="editar-dia-qua" value="QUA"> Qua</label>
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="editar-dia-qui" value="QUI"> Qui</label>
+      <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="editar-dia-sex" value="SEX"> Sex</label>
+    </div>
+    <p style="font-size:11px; color:var(--muted); margin:6px 0 0;">Deixe tudo desmarcado para valer todo dia útil.</p>
+
+    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:14px;">
+      <input type="checkbox" id="editar-usa-intervalo"> Alternar semanas (ex: uma semana sim, uma não)
+    </label>
+    <div id="editar-intervalo-semanas-campos" style="display:none; gap:10px; margin-top:8px;">
+      <div style="flex:1;">
+        <label style="margin-top:0;">Repetir a cada quantas semanas</label>
+        <input type="number" id="editar-intervalo-semanas" min="2" placeholder="Ex: 2">
+      </div>
+      <div style="flex:1;">
+        <label style="margin-top:0;">Uma data numa semana "ativa"</label>
+        <input type="date" id="editar-data-referencia">
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" id="editar-cancelar">Cancelar</button>
       <button class="btn-salvar" id="editar-salvar">Salvar alterações</button>
@@ -525,6 +549,31 @@
           <input type="number" id="input-dia-fim" min="1" max="31" placeholder="Ex: 5">
         </div>
       </div>
+
+      <label style="margin-top:14px;">Dias da semana específicos (opcional)</label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="input-dia-seg" value="SEG"> Seg</label>
+        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="input-dia-ter" value="TER"> Ter</label>
+        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="input-dia-qua" value="QUA"> Qua</label>
+        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="input-dia-qui" value="QUI"> Qui</label>
+        <label style="display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer;"><input type="checkbox" id="input-dia-sex" value="SEX"> Sex</label>
+      </div>
+      <p style="font-size:11px; color:var(--muted); margin:6px 0 0;">Deixe tudo desmarcado para valer todo dia útil (padrão). Marque só os dias que essa rotina se repete, ex: Seg + Ter.</p>
+
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:14px;">
+        <input type="checkbox" id="input-usa-intervalo"> Alternar semanas (ex: uma semana sim, uma não)
+      </label>
+      <div id="intervalo-semanas-campos" style="display:none; gap:10px; margin-top:8px;">
+        <div style="flex:1;">
+          <label style="margin-top:0;">Repetir a cada quantas semanas</label>
+          <input type="number" id="input-intervalo-semanas" min="2" placeholder="Ex: 2">
+        </div>
+        <div style="flex:1;">
+          <label style="margin-top:0;">Uma data numa semana "ativa"</label>
+          <input type="date" id="input-data-referencia">
+        </div>
+      </div>
+      <p id="intervalo-semanas-dica" style="display:none; font-size:11px; color:var(--muted); margin:6px 0 0;">Ex: pra "uma semana sim, uma não", coloque 2 e escolha qualquer segunda-feira em que a rotina DEVE acontecer.</p>
     </div>
 
     <div class="modal-actions">
@@ -805,12 +854,25 @@ function abrirModal(){
   document.getElementById('periodo-dias').style.display = 'none';
   document.getElementById('input-dia-inicio').value = '';
   document.getElementById('input-dia-fim').value = '';
+  ['seg','ter','qua','qui','sex'].forEach(d => {
+    document.getElementById('input-dia-' + d).checked = false;
+  });
+  document.getElementById('input-usa-intervalo').checked = false;
+  document.getElementById('intervalo-semanas-campos').style.display = 'none';
+  document.getElementById('intervalo-semanas-dica').style.display = 'none';
+  document.getElementById('input-intervalo-semanas').value = '';
+  document.getElementById('input-data-referencia').value = '';
   overlay.classList.add('open');
 }
 document.getElementById('modal-cancelar').addEventListener('click', () => overlay.classList.remove('open'));
 
 document.getElementById('input-usa-periodo').addEventListener('change', (e) => {
   document.getElementById('periodo-dias').style.display = e.target.checked ? 'flex' : 'none';
+});
+
+document.getElementById('input-usa-intervalo').addEventListener('change', (e) => {
+  document.getElementById('intervalo-semanas-campos').style.display = e.target.checked ? 'flex' : 'none';
+  document.getElementById('intervalo-semanas-dica').style.display = e.target.checked ? 'block' : 'none';
 });
 
 document.querySelectorAll('.modal-tab').forEach(tab => {
@@ -834,6 +896,13 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
   const usaPeriodo = document.getElementById('input-usa-periodo').checked;
   const diaInicio = document.getElementById('input-dia-inicio').value;
   const diaFim = document.getElementById('input-dia-fim').value;
+  const diasSemana = ['seg','ter','qua','qui','sex']
+    .filter(d => document.getElementById('input-dia-' + d).checked)
+    .map(d => d.toUpperCase())
+    .join(',');
+  const usaIntervalo = document.getElementById('input-usa-intervalo').checked;
+  const intervaloSemanas = document.getElementById('input-intervalo-semanas').value;
+  const dataReferencia = document.getElementById('input-data-referencia').value;
 
   if (!tarefa || !responsavel || !horario){
     toast('Preencha todos os campos.');
@@ -841,6 +910,10 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
   }
   if (tipoModal === 'rotina' && usaPeriodo && (!diaInicio || !diaFim)){
     toast('Preencha o dia início e o dia fim do período.');
+    return;
+  }
+  if (tipoModal === 'rotina' && usaIntervalo && (!intervaloSemanas || !dataReferencia)){
+    toast('Preencha o intervalo de semanas e a data de referência.');
     return;
   }
 
@@ -856,6 +929,13 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
       if (usaPeriodo){
         payload.diaInicio = diaInicio;
         payload.diaFim = diaFim;
+      }
+      if (diasSemana){
+        payload.diasSemana = diasSemana;
+      }
+      if (usaIntervalo){
+        payload.intervaloSemanas = intervaloSemanas;
+        payload.dataReferencia = dataReferencia;
       }
       res = await apiPost(payload);
     }
@@ -1058,6 +1138,8 @@ function renderRotinasCadastradas(rotinas){
           <span class="badge ${r.prioridade}">${r.prioridade === 'Media' ? 'Média' : r.prioridade}</span>
           <span class="prazo">Prazo: ${r.horarioLimite}</span>
           ${(r.diaInicio && r.diaFim) ? `<span class="prazo" style="color:var(--primary);">Dia ${r.diaInicio} ao ${r.diaFim} do mês</span>` : ''}
+          ${r.diasSemana ? `<span class="prazo" style="color:var(--primary);">${escapeHtml(r.diasSemana)}</span>` : ''}
+          ${(r.intervaloSemanas && r.dataReferencia) ? `<span class="prazo" style="color:var(--primary);">a cada ${r.intervaloSemanas} semanas</span>` : ''}
           ${!r.ativo ? '<span class="prazo" style="color:var(--muted);">Cancelada</span>' : ''}
         </div>
       </div>
@@ -1118,6 +1200,17 @@ function abrirEditarRotina(id, listaOrigem){
   document.getElementById('editar-dia-inicio').value = rotina.diaInicio || '';
   document.getElementById('editar-dia-fim').value = rotina.diaFim || '';
 
+  const diasMarcados = (rotina.diasSemana || '').toUpperCase().split(',').map(s => s.trim());
+  ['seg','ter','qua','qui','sex'].forEach(d => {
+    document.getElementById('editar-dia-' + d).checked = diasMarcados.includes(d.toUpperCase());
+  });
+
+  const temIntervalo = !!(rotina.intervaloSemanas && rotina.dataReferencia);
+  document.getElementById('editar-usa-intervalo').checked = temIntervalo;
+  document.getElementById('editar-intervalo-semanas-campos').style.display = temIntervalo ? 'flex' : 'none';
+  document.getElementById('editar-intervalo-semanas').value = rotina.intervaloSemanas || '';
+  document.getElementById('editar-data-referencia').value = rotina.dataReferencia || '';
+
   document.getElementById('dia-detalhe-overlay').classList.remove('open');
   editarOverlay.classList.add('open');
 }
@@ -1132,6 +1225,10 @@ document.getElementById('editar-usa-periodo').addEventListener('change', (e) => 
   document.getElementById('editar-periodo-dias').style.display = e.target.checked ? 'flex' : 'none';
 });
 
+document.getElementById('editar-usa-intervalo').addEventListener('change', (e) => {
+  document.getElementById('editar-intervalo-semanas-campos').style.display = e.target.checked ? 'flex' : 'none';
+});
+
 document.getElementById('editar-salvar').addEventListener('click', async () => {
   const tarefa = document.getElementById('editar-tarefa').value.trim();
   const responsavel = document.getElementById('editar-responsavel').value;
@@ -1140,6 +1237,13 @@ document.getElementById('editar-salvar').addEventListener('click', async () => {
   const usaPeriodo = document.getElementById('editar-usa-periodo').checked;
   const diaInicio = document.getElementById('editar-dia-inicio').value;
   const diaFim = document.getElementById('editar-dia-fim').value;
+  const diasSemana = ['seg','ter','qua','qui','sex']
+    .filter(d => document.getElementById('editar-dia-' + d).checked)
+    .map(d => d.toUpperCase())
+    .join(',');
+  const usaIntervalo = document.getElementById('editar-usa-intervalo').checked;
+  const intervaloSemanas = document.getElementById('editar-intervalo-semanas').value;
+  const dataReferencia = document.getElementById('editar-data-referencia').value;
 
   if (!tarefa || !responsavel || !horarioLimite){
     toast('Preencha todos os campos.');
@@ -1147,6 +1251,10 @@ document.getElementById('editar-salvar').addEventListener('click', async () => {
   }
   if (usaPeriodo && (!diaInicio || !diaFim)){
     toast('Preencha o dia início e o dia fim do período.');
+    return;
+  }
+  if (usaIntervalo && (!intervaloSemanas || !dataReferencia)){
+    toast('Preencha o intervalo de semanas e a data de referência.');
     return;
   }
 
@@ -1159,7 +1267,10 @@ document.getElementById('editar-salvar').addEventListener('click', async () => {
       id: editarRotinaIdAtual,
       tarefa, responsavel, horarioLimite, prioridade,
       diaInicio: usaPeriodo ? diaInicio : '',
-      diaFim: usaPeriodo ? diaFim : ''
+      diaFim: usaPeriodo ? diaFim : '',
+      diasSemana: diasSemana,
+      intervaloSemanas: usaIntervalo ? intervaloSemanas : '',
+      dataReferencia: usaIntervalo ? dataReferencia : ''
     });
     if (res.ok){
       toast('Rotina atualizada!');
@@ -1208,11 +1319,47 @@ function rotinaValidaNoDiaCliente(diaInicio, diaFim, diaAtual){
   return diaAtual >= di || diaAtual <= df;
 }
 
+const DIAS_SEMANA_ABREV_CLIENTE = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+function diaSemanaValidoCliente(diasSemana, diaSemanaNum){
+  if (!diasSemana || String(diasSemana).trim() === '') return true;
+  const lista = String(diasSemana).toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
+  if (lista.length === 0) return true;
+  return lista.includes(DIAS_SEMANA_ABREV_CLIENTE[diaSemanaNum]);
+}
+
+function inicioDaSemanaCliente(date){
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diaSemana = d.getDay();
+  const deslocamento = (diaSemana === 0 ? -6 : 1 - diaSemana);
+  d.setDate(d.getDate() + deslocamento);
+  return d;
+}
+
+function semanaValidaCliente(dataReferencia, intervaloSemanas, date){
+  if (!dataReferencia || !intervaloSemanas) return true;
+  const intervalo = Number(intervaloSemanas);
+  if (isNaN(intervalo) || intervalo <= 1) return true;
+
+  const [ano, mes, dia] = dataReferencia.split('-').map(Number);
+  const refDate = new Date(ano, mes - 1, dia);
+  const inicioRef = inicioDaSemanaCliente(refDate);
+  const inicioHoje = inicioDaSemanaCliente(date);
+
+  const diffDias = Math.round((inicioHoje - inicioRef) / (1000 * 60 * 60 * 24));
+  const diffSemanas = Math.floor(diffDias / 7);
+  const resto = ((diffSemanas % intervalo) + intervalo) % intervalo;
+  return resto === 0;
+}
+
 function itensDoDiaCalendario(dia, dataStr, diaSemana){
   const itens = [];
   if (diaSemana !== 0 && diaSemana !== 6){
+    const dataDoItem = new Date(calAnoAtual, calMesAtual, dia);
     calData.rotinas.forEach(r => {
-      if (r.ativo && rotinaValidaNoDiaCliente(r.diaInicio, r.diaFim, dia)){
+      if (r.ativo
+          && rotinaValidaNoDiaCliente(r.diaInicio, r.diaFim, dia)
+          && diaSemanaValidoCliente(r.diasSemana, diaSemana)
+          && semanaValidaCliente(r.dataReferencia, r.intervaloSemanas, dataDoItem)){
         itens.push({ id: r.id, tarefa: r.tarefa, responsavel: r.responsavel, prioridade: r.prioridade, horarioLimite: r.horarioLimite, tipo: 'Rotina diária' });
       }
     });
