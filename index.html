@@ -379,6 +379,7 @@
       <button class="btn-salvar" id="menu-nova-tarefa" style="margin-bottom:8px;">➕ Nova tarefa / rotina</button>
       <button class="btn-salvar" id="menu-gestao" style="margin-bottom:8px;">📋 Gestão de rotinas (ver todas)</button>
       <button class="btn-salvar" id="menu-cancelar-rotinas" style="margin-bottom:8px; background:var(--muted);">🗑 Cancelar rotina cadastrada</button>
+      <button class="btn-salvar" id="menu-calendario" style="margin-bottom:8px; background:#6B3FA0;">📅 Ver calendário</button>
       <button class="btn-cancel" id="menu-cancelar">Cancelar</button>
     </div>
   </div>
@@ -405,12 +406,79 @@
 <div id="tela-rotinas" style="display:none;">
   <main style="padding-top:10px;">
     <div class="section-title" style="margin-bottom:10px;">Rotinas cadastradas</div>
-    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Cancelar não apaga o histórico — a rotina só para de aparecer na agenda diária. Dá pra reativar quando quiser.</p>
+    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Cancelar não apaga o histórico — a rotina só para de aparecer na agenda diária. Dá pra reativar quando quiser. Use "Editar" pra mudar tarefa, responsável, horário ou período do mês.</p>
     <div style="margin-bottom:14px;">
       <button class="concluir-btn" id="btn-atualizar-rotinas">🔄 Atualizar</button>
     </div>
     <div id="rotinas-cadastradas-list"><div class="empty">Carregando...</div></div>
   </main>
+</div>
+
+<div class="modal-overlay" id="editar-rotina-overlay">
+  <div class="modal">
+    <h2>Editar rotina</h2>
+
+    <label>Descrição da tarefa</label>
+    <input type="text" id="editar-tarefa">
+
+    <label>Responsável</label>
+    <select id="editar-responsavel"></select>
+
+    <label>Horário limite</label>
+    <input type="time" id="editar-horario">
+
+    <label>Prioridade</label>
+    <select id="editar-prioridade">
+      <option value="Alta">Alta</option>
+      <option value="Media">Média</option>
+      <option value="Baixa">Baixa</option>
+    </select>
+
+    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+      <input type="checkbox" id="editar-usa-periodo"> Repetir só num período do mês
+    </label>
+    <div id="editar-periodo-dias" style="display:none; gap:10px; margin-top:8px;">
+      <div style="flex:1;">
+        <label style="margin-top:0;">Dia início</label>
+        <input type="number" id="editar-dia-inicio" min="1" max="31">
+      </div>
+      <div style="flex:1;">
+        <label style="margin-top:0;">Dia fim</label>
+        <input type="number" id="editar-dia-fim" min="1" max="31">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editar-cancelar">Cancelar</button>
+      <button class="btn-salvar" id="editar-salvar">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<div id="tela-calendario" style="display:none;">
+  <main style="padding-top:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+      <button class="icon-btn" id="cal-mes-anterior" style="background:var(--primary); color:#fff;">◀</button>
+      <div class="section-title" id="cal-mes-label" style="margin:0;">-</div>
+      <button class="icon-btn" id="cal-mes-seguinte" style="background:var(--primary); color:#fff;">▶</button>
+    </div>
+    <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:10px;">
+      <span>🔴 Alta</span>
+      <span>🟡 Média</span>
+      <span>🟢 Baixa</span>
+    </div>
+    <div id="calendario-grid"></div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="dia-detalhe-overlay">
+  <div class="modal">
+    <h2 id="dia-detalhe-titulo">Tarefas do dia</h2>
+    <div id="dia-detalhe-lista"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="dia-detalhe-fechar">Fechar</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modal-overlay">
@@ -610,8 +678,7 @@ async function carregarColaboradores(){
 
 function selecionarColaborador(nome){
   colaboradorAtual = nome;
-  document.getElementById('tela-selecao').style.display = 'none';
-  document.getElementById('tela-gestao').style.display = 'none';
+  ocultarTodasAsTelas();
   document.getElementById('tela-tarefas').style.display = 'block';
   document.getElementById('voltar-btn').classList.add('show');
   document.getElementById('header-titulo').textContent = nome;
@@ -619,12 +686,18 @@ function selecionarColaborador(nome){
   carregarDados();
 }
 
-function voltarTelaInicial(){
-  colaboradorAtual = '';
-  document.getElementById('tela-selecao').style.display = 'block';
+function ocultarTodasAsTelas(){
+  document.getElementById('tela-selecao').style.display = 'none';
   document.getElementById('tela-tarefas').style.display = 'none';
   document.getElementById('tela-gestao').style.display = 'none';
   document.getElementById('tela-rotinas').style.display = 'none';
+  document.getElementById('tela-calendario').style.display = 'none';
+}
+
+function voltarTelaInicial(){
+  colaboradorAtual = '';
+  ocultarTodasAsTelas();
+  document.getElementById('tela-selecao').style.display = 'block';
   document.getElementById('voltar-btn').classList.remove('show');
   document.getElementById('header-titulo').textContent = 'Agenda de Rotinas';
   document.getElementById('header-sub').textContent = 'Central de Compras · Grupo Jorlan';
@@ -632,9 +705,7 @@ function voltarTelaInicial(){
 document.getElementById('voltar-btn').addEventListener('click', voltarTelaInicial);
 
 function abrirGestao(){
-  document.getElementById('tela-selecao').style.display = 'none';
-  document.getElementById('tela-tarefas').style.display = 'none';
-  document.getElementById('tela-rotinas').style.display = 'none';
+  ocultarTodasAsTelas();
   document.getElementById('tela-gestao').style.display = 'block';
   document.getElementById('voltar-btn').classList.add('show');
   document.getElementById('header-titulo').textContent = 'Gestão de Rotinas';
@@ -643,14 +714,21 @@ function abrirGestao(){
 }
 
 function abrirGerenciarRotinas(){
-  document.getElementById('tela-selecao').style.display = 'none';
-  document.getElementById('tela-tarefas').style.display = 'none';
-  document.getElementById('tela-gestao').style.display = 'none';
+  ocultarTodasAsTelas();
   document.getElementById('tela-rotinas').style.display = 'block';
   document.getElementById('voltar-btn').classList.add('show');
   document.getElementById('header-titulo').textContent = 'Rotinas Cadastradas';
-  document.getElementById('header-sub').textContent = 'Cancelar ou reativar rotinas diárias';
+  document.getElementById('header-sub').textContent = 'Ver, editar, cancelar ou reativar rotinas';
   carregarRotinasCadastradas();
+}
+
+function abrirCalendario(){
+  ocultarTodasAsTelas();
+  document.getElementById('tela-calendario').style.display = 'block';
+  document.getElementById('voltar-btn').classList.add('show');
+  document.getElementById('header-titulo').textContent = 'Calendário de Rotinas';
+  document.getElementById('header-sub').textContent = 'Visão mensal de todas as tarefas';
+  carregarCalendario();
 }
 
 async function carregarDados(){
@@ -712,6 +790,10 @@ document.getElementById('menu-gestao').addEventListener('click', () => {
 document.getElementById('menu-cancelar-rotinas').addEventListener('click', () => {
   gestorMenuOverlay.classList.remove('open');
   abrirGerenciarRotinas();
+});
+document.getElementById('menu-calendario').addEventListener('click', () => {
+  gestorMenuOverlay.classList.remove('open');
+  abrirCalendario();
 });
 
 function abrirModal(){
@@ -934,12 +1016,15 @@ document.getElementById('btn-cobrar-todos').addEventListener('click', async () =
 });
 
 // ---------------- Gerenciar rotinas cadastradas ----------------
+let rotinasCadastradasAtuais = [];
+
 async function carregarRotinasCadastradas(){
   const container = document.getElementById('rotinas-cadastradas-list');
   container.innerHTML = '<div class="empty">Carregando...</div>';
   try{
     const data = await apiGet({ action: 'listarRotinas' });
-    renderRotinasCadastradas(data.rotinas || []);
+    rotinasCadastradasAtuais = data.rotinas || [];
+    renderRotinasCadastradas(rotinasCadastradasAtuais);
   }catch(err){
     toast('Erro ao carregar rotinas cadastradas.');
   }
@@ -969,10 +1054,13 @@ function renderRotinasCadastradas(rotinas){
           ${!r.ativo ? '<span class="prazo" style="color:var(--muted);">Cancelada</span>' : ''}
         </div>
       </div>
-      ${r.ativo
-        ? `<button class="concluir-btn" style="background:var(--alta);" onclick="alternarStatusRotina('${r.id}', false, this)">Cancelar</button>`
-        : `<button class="concluir-btn" style="background:var(--baixa);" onclick="alternarStatusRotina('${r.id}', true, this)">Reativar</button>`
-      }
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <button class="concluir-btn" onclick="abrirEditarRotina('${r.id}')">✏️ Editar</button>
+        ${r.ativo
+          ? `<button class="concluir-btn" style="background:var(--alta);" onclick="alternarStatusRotina('${r.id}', false, this)">Cancelar</button>`
+          : `<button class="concluir-btn" style="background:var(--baixa);" onclick="alternarStatusRotina('${r.id}', true, this)">Reativar</button>`
+        }
+      </div>
     </div>
   `).join('');
 }
@@ -999,7 +1087,218 @@ async function alternarStatusRotina(id, ativar, btn){
 
 document.getElementById('btn-atualizar-rotinas').addEventListener('click', carregarRotinasCadastradas);
 
+// ---------------- Editar rotina ----------------
+const editarOverlay = document.getElementById('editar-rotina-overlay');
+let editarRotinaIdAtual = null;
 
+function abrirEditarRotina(id){
+  const rotina = rotinasCadastradasAtuais.find(r => String(r.id) === String(id));
+  if (!rotina){ toast('Rotina não encontrada.'); return; }
+
+  editarRotinaIdAtual = rotina.id;
+  document.getElementById('editar-tarefa').value = rotina.tarefa;
+  document.getElementById('editar-horario').value = rotina.horarioLimite;
+  document.getElementById('editar-prioridade').value = rotina.prioridade;
+
+  const selectResp = document.getElementById('editar-responsavel');
+  selectResp.innerHTML = document.getElementById('input-responsavel').innerHTML;
+  selectResp.value = rotina.responsavel;
+
+  const temPeriodo = !!(rotina.diaInicio && rotina.diaFim);
+  document.getElementById('editar-usa-periodo').checked = temPeriodo;
+  document.getElementById('editar-periodo-dias').style.display = temPeriodo ? 'flex' : 'none';
+  document.getElementById('editar-dia-inicio').value = rotina.diaInicio || '';
+  document.getElementById('editar-dia-fim').value = rotina.diaFim || '';
+
+  editarOverlay.classList.add('open');
+}
+
+document.getElementById('editar-cancelar').addEventListener('click', () => editarOverlay.classList.remove('open'));
+
+document.getElementById('editar-usa-periodo').addEventListener('change', (e) => {
+  document.getElementById('editar-periodo-dias').style.display = e.target.checked ? 'flex' : 'none';
+});
+
+document.getElementById('editar-salvar').addEventListener('click', async () => {
+  const tarefa = document.getElementById('editar-tarefa').value.trim();
+  const responsavel = document.getElementById('editar-responsavel').value;
+  const horarioLimite = document.getElementById('editar-horario').value;
+  const prioridade = document.getElementById('editar-prioridade').value;
+  const usaPeriodo = document.getElementById('editar-usa-periodo').checked;
+  const diaInicio = document.getElementById('editar-dia-inicio').value;
+  const diaFim = document.getElementById('editar-dia-fim').value;
+
+  if (!tarefa || !responsavel || !horarioLimite){
+    toast('Preencha todos os campos.');
+    return;
+  }
+  if (usaPeriodo && (!diaInicio || !diaFim)){
+    toast('Preencha o dia início e o dia fim do período.');
+    return;
+  }
+
+  const btn = document.getElementById('editar-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  try{
+    const res = await apiPost({
+      action: 'editarRotina',
+      id: editarRotinaIdAtual,
+      tarefa, responsavel, horarioLimite, prioridade,
+      diaInicio: usaPeriodo ? diaInicio : '',
+      diaFim: usaPeriodo ? diaFim : ''
+    });
+    if (res.ok){
+      toast('Rotina atualizada!');
+      editarOverlay.classList.remove('open');
+      carregarRotinasCadastradas();
+    }else{
+      toast('Erro: ' + (res.erro || 'não foi possível salvar'));
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Salvar alterações';
+  }
+});
+
+// ---------------- Calendário ----------------
+const NOMES_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+let calData = { rotinas: [], tarefas: [] };
+let calMesAtual = new Date().getMonth();
+let calAnoAtual = new Date().getFullYear();
+
+async function carregarCalendario(){
+  document.getElementById('calendario-grid').innerHTML = '<div class="empty">Carregando...</div>';
+  try{
+    const [rotinasResp, tarefasResp] = await Promise.all([
+      apiGet({ action: 'listarRotinas' }),
+      apiGet({ action: 'listarTarefasTodas' })
+    ]);
+    calData.rotinas = rotinasResp.rotinas || [];
+    calData.tarefas = tarefasResp.tarefas || [];
+    renderCalendario();
+  }catch(err){
+    toast('Erro ao carregar calendário.');
+  }
+}
+
+function rotinaValidaNoDiaCliente(diaInicio, diaFim, diaAtual){
+  if (!diaInicio || !diaFim) return true;
+  const di = Number(diaInicio), df = Number(diaFim);
+  if (isNaN(di) || isNaN(df)) return true;
+  if (di <= df) return diaAtual >= di && diaAtual <= df;
+  return diaAtual >= di || diaAtual <= df;
+}
+
+function itensDoDiaCalendario(dia, dataStr, diaSemana){
+  const itens = [];
+  if (diaSemana !== 0 && diaSemana !== 6){
+    calData.rotinas.forEach(r => {
+      if (r.ativo && rotinaValidaNoDiaCliente(r.diaInicio, r.diaFim, dia)){
+        itens.push({ tarefa: r.tarefa, responsavel: r.responsavel, prioridade: r.prioridade, horarioLimite: r.horarioLimite, tipo: 'Rotina diária' });
+      }
+    });
+  }
+  calData.tarefas.forEach(t => {
+    if (t.data === dataStr){
+      itens.push({ tarefa: t.tarefa, responsavel: t.responsavel, prioridade: t.prioridade, horarioLimite: t.horarioLimite, tipo: 'Tarefa do dia' });
+    }
+  });
+  return itens;
+}
+
+function renderCalendario(){
+  document.getElementById('cal-mes-label').textContent = NOMES_MESES[calMesAtual] + ' ' + calAnoAtual;
+
+  const primeiroDiaSemana = new Date(calAnoAtual, calMesAtual, 1).getDay();
+  const diasNoMes = new Date(calAnoAtual, calMesAtual + 1, 0).getDate();
+  const diasSemanaLabels = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const hojeCliente = new Date();
+
+  let html = '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px;">';
+  diasSemanaLabels.forEach(l => {
+    html += `<div style="text-align:center; font-size:11px; font-weight:700; color:var(--muted); padding:4px 0;">${l}</div>`;
+  });
+  for (let i = 0; i < primeiroDiaSemana; i++){
+    html += '<div></div>';
+  }
+
+  for (let dia = 1; dia <= diasNoMes; dia++){
+    const diaSemana = new Date(calAnoAtual, calMesAtual, dia).getDay();
+    const dataStr = calAnoAtual + '-' + String(calMesAtual+1).padStart(2,'0') + '-' + String(dia).padStart(2,'0');
+    const itens = itensDoDiaCalendario(dia, dataStr, diaSemana);
+    const ehHoje = hojeCliente.getDate() === dia && hojeCliente.getMonth() === calMesAtual && hojeCliente.getFullYear() === calAnoAtual;
+    const fimDeSemana = diaSemana === 0 || diaSemana === 6;
+
+    const pontos = itens.slice(0,4).map(item => {
+      const cor = item.prioridade === 'Alta' ? 'var(--alta)' : (item.prioridade === 'Media' ? 'var(--media)' : 'var(--baixa)');
+      return `<div style="width:7px; height:7px; border-radius:50%; background:${cor};" title="${escapeHtml(item.tarefa)} - ${escapeHtml(item.responsavel)}"></div>`;
+    }).join('');
+    const maisTexto = itens.length > 4 ? `<div style="font-size:9px; color:var(--muted);">+${itens.length-4}</div>` : '';
+
+    html += `
+      <div onclick='abrirDetalheDia(${dia})' style="
+        min-height:64px; border-radius:8px; padding:6px;
+        background:${fimDeSemana ? 'var(--bg)' : 'var(--card)'};
+        border:1px solid ${ehHoje ? 'var(--primary)' : 'var(--border)'};
+        box-shadow:${ehHoje ? '0 0 0 2px var(--primary)' : 'none'};
+        cursor:pointer; display:flex; flex-direction:column; gap:4px;
+      ">
+        <div style="font-size:12px; font-weight:${ehHoje ? '800' : '600'}; color:${fimDeSemana ? 'var(--muted)' : 'var(--text)'};">${dia}</div>
+        <div style="display:flex; gap:3px; flex-wrap:wrap;">${pontos}${maisTexto}</div>
+      </div>
+    `;
+  }
+
+  html += '</div>';
+  document.getElementById('calendario-grid').innerHTML = html;
+}
+
+function abrirDetalheDia(dia){
+  const diaSemana = new Date(calAnoAtual, calMesAtual, dia).getDay();
+  const dataStr = calAnoAtual + '-' + String(calMesAtual+1).padStart(2,'0') + '-' + String(dia).padStart(2,'0');
+  const itens = itensDoDiaCalendario(dia, dataStr, diaSemana);
+
+  document.getElementById('dia-detalhe-titulo').textContent =
+    'Tarefas de ' + String(dia).padStart(2,'0') + '/' + String(calMesAtual+1).padStart(2,'0') + '/' + calAnoAtual;
+
+  const lista = document.getElementById('dia-detalhe-lista');
+  if (itens.length === 0){
+    lista.innerHTML = '<div class="empty">Nenhuma tarefa nesse dia (ou é fim de semana).</div>';
+  } else {
+    lista.innerHTML = itens.map(item => `
+      <div class="task-card prio-${item.prioridade}" style="margin-bottom:8px;">
+        <div class="task-info">
+          <p class="task-title">${escapeHtml(item.tarefa)}</p>
+          <div class="task-meta">
+            <span class="badge" style="background:var(--primary);">${escapeHtml(item.responsavel)}</span>
+            <span class="badge ${item.prioridade}">${item.prioridade === 'Media' ? 'Média' : item.prioridade}</span>
+            <span class="prazo">Prazo: ${item.horarioLimite}</span>
+            <span class="prazo" style="color:var(--muted);">${item.tipo}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('dia-detalhe-overlay').classList.add('open');
+}
+
+document.getElementById('dia-detalhe-fechar').addEventListener('click', () => {
+  document.getElementById('dia-detalhe-overlay').classList.remove('open');
+});
+
+document.getElementById('cal-mes-anterior').addEventListener('click', () => {
+  calMesAtual--;
+  if (calMesAtual < 0){ calMesAtual = 11; calAnoAtual--; }
+  renderCalendario();
+});
+document.getElementById('cal-mes-seguinte').addEventListener('click', () => {
+  calMesAtual++;
+  if (calMesAtual > 11){ calMesAtual = 0; calAnoAtual++; }
+  renderCalendario();
+});
 </script>
 
 </body>
