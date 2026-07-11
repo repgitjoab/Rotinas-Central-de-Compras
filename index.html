@@ -440,6 +440,22 @@
       <option value="Baixa">Baixa</option>
     </select>
 
+    <div id="campos-periodo" style="display:none;">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="input-usa-periodo"> Repetir só num período do mês (ex: todo dia 1 ao dia 5)
+      </label>
+      <div id="periodo-dias" style="display:none; gap:10px; margin-top:8px;">
+        <div style="flex:1;">
+          <label style="margin-top:0;">Dia início</label>
+          <input type="number" id="input-dia-inicio" min="1" max="31" placeholder="Ex: 1">
+        </div>
+        <div style="flex:1;">
+          <label style="margin-top:0;">Dia fim</label>
+          <input type="number" id="input-dia-fim" min="1" max="31" placeholder="Ex: 5">
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" id="modal-cancelar">Cancelar</button>
       <button class="btn-salvar" id="modal-salvar">Salvar</button>
@@ -700,9 +716,17 @@ document.getElementById('menu-cancelar-rotinas').addEventListener('click', () =>
 
 function abrirModal(){
   document.getElementById('input-data').valueAsDate = new Date();
+  document.getElementById('input-usa-periodo').checked = false;
+  document.getElementById('periodo-dias').style.display = 'none';
+  document.getElementById('input-dia-inicio').value = '';
+  document.getElementById('input-dia-fim').value = '';
   overlay.classList.add('open');
 }
 document.getElementById('modal-cancelar').addEventListener('click', () => overlay.classList.remove('open'));
+
+document.getElementById('input-usa-periodo').addEventListener('change', (e) => {
+  document.getElementById('periodo-dias').style.display = e.target.checked ? 'flex' : 'none';
+});
 
 document.querySelectorAll('.modal-tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -712,6 +736,7 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
     document.getElementById('modal-title').textContent = tipoModal === 'tarefa' ? 'Nova tarefa do dia' : 'Nova rotina diária';
     document.getElementById('label-data').style.display = tipoModal === 'tarefa' ? 'block' : 'none';
     document.getElementById('input-data').style.display = tipoModal === 'tarefa' ? 'block' : 'none';
+    document.getElementById('campos-periodo').style.display = tipoModal === 'rotina' ? 'block' : 'none';
   });
 });
 
@@ -721,9 +746,16 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
   const horario = document.getElementById('input-horario').value;
   const prioridade = document.getElementById('input-prioridade').value;
   const data = document.getElementById('input-data').value;
+  const usaPeriodo = document.getElementById('input-usa-periodo').checked;
+  const diaInicio = document.getElementById('input-dia-inicio').value;
+  const diaFim = document.getElementById('input-dia-fim').value;
 
   if (!tarefa || !responsavel || !horario){
     toast('Preencha todos os campos.');
+    return;
+  }
+  if (tipoModal === 'rotina' && usaPeriodo && (!diaInicio || !diaFim)){
+    toast('Preencha o dia início e o dia fim do período.');
     return;
   }
 
@@ -735,7 +767,12 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
     if (tipoModal === 'tarefa'){
       res = await apiPost({ action: 'novaTarefa', tarefa, responsavel, data, horarioLimite: horario, prioridade });
     }else{
-      res = await apiPost({ action: 'novaRotina', tarefa, responsavel, horarioLimite: horario, prioridade });
+      const payload = { action: 'novaRotina', tarefa, responsavel, horarioLimite: horario, prioridade };
+      if (usaPeriodo){
+        payload.diaInicio = diaInicio;
+        payload.diaFim = diaFim;
+      }
+      res = await apiPost(payload);
     }
     if (res.ok){
       toast('Salvo com sucesso!');
@@ -928,6 +965,7 @@ function renderRotinasCadastradas(rotinas){
           <span class="badge" style="background:var(--primary);">${escapeHtml(r.responsavel)}</span>
           <span class="badge ${r.prioridade}">${r.prioridade === 'Media' ? 'Média' : r.prioridade}</span>
           <span class="prazo">Prazo: ${r.horarioLimite}</span>
+          ${(r.diaInicio && r.diaFim) ? `<span class="prazo" style="color:var(--primary);">Dia ${r.diaInicio} ao ${r.diaFim} do mês</span>` : ''}
           ${!r.ativo ? '<span class="prazo" style="color:var(--muted);">Cancelada</span>' : ''}
         </div>
       </div>
