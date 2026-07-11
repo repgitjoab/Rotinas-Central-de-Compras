@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agenda de Rotinas - Central de Compras - Grupo Jorlan</title>
+<title>Ferramenta de Rotinas - Central de Compras - Grupo Jorlan</title>
 <style>
   :root{
     --bg: #f2f4f7;
@@ -370,7 +370,36 @@
   <div id="tarefas-list"><div class="empty">Carregando...</div></div>
 </main>
 
-<button class="fab" id="add-fab" title="Adicionar (gestor)">+</button>
+<button class="fab" id="add-fab" title="Área do gestor">+</button>
+
+<div class="modal-overlay" id="gestor-menu-overlay">
+  <div class="modal">
+    <h2>Área do gestor</h2>
+    <div class="modal-actions" style="flex-direction:column;">
+      <button class="btn-salvar" id="menu-nova-tarefa" style="margin-bottom:8px;">➕ Nova tarefa / rotina</button>
+      <button class="btn-salvar" id="menu-gestao" style="margin-bottom:8px;">📋 Gestão de rotinas (ver todas)</button>
+      <button class="btn-cancel" id="menu-cancelar">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="tela-gestao" style="display:none;">
+  <main style="padding-top:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
+      <div class="section-title" style="margin:0;">Pendências de todos os colaboradores</div>
+      <div style="display:flex; gap:8px;">
+        <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="check-mostrar-todos"> mostrar concluídas
+        </label>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+      <button class="concluir-btn" id="btn-atualizar-gestao">🔄 Atualizar</button>
+      <button class="concluir-btn" id="btn-cobrar-todos" style="background:var(--alta);">📧 Cobrar todos atrasados</button>
+    </div>
+    <div id="gestao-list"><div class="empty">Carregando...</div></div>
+  </main>
+</div>
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
@@ -554,6 +583,7 @@ async function carregarColaboradores(){
 function selecionarColaborador(nome){
   colaboradorAtual = nome;
   document.getElementById('tela-selecao').style.display = 'none';
+  document.getElementById('tela-gestao').style.display = 'none';
   document.getElementById('tela-tarefas').style.display = 'block';
   document.getElementById('voltar-btn').classList.add('show');
   document.getElementById('header-titulo').textContent = nome;
@@ -561,14 +591,26 @@ function selecionarColaborador(nome){
   carregarDados();
 }
 
-document.getElementById('voltar-btn').addEventListener('click', () => {
+function voltarTelaInicial(){
   colaboradorAtual = '';
   document.getElementById('tela-selecao').style.display = 'block';
   document.getElementById('tela-tarefas').style.display = 'none';
+  document.getElementById('tela-gestao').style.display = 'none';
   document.getElementById('voltar-btn').classList.remove('show');
   document.getElementById('header-titulo').textContent = 'Agenda de Rotinas';
   document.getElementById('header-sub').textContent = 'Central de Compras · Grupo Jorlan';
-});
+}
+document.getElementById('voltar-btn').addEventListener('click', voltarTelaInicial);
+
+function abrirGestao(){
+  document.getElementById('tela-selecao').style.display = 'none';
+  document.getElementById('tela-tarefas').style.display = 'none';
+  document.getElementById('tela-gestao').style.display = 'block';
+  document.getElementById('voltar-btn').classList.add('show');
+  document.getElementById('header-titulo').textContent = 'Gestão de Rotinas';
+  document.getElementById('header-sub').textContent = 'Pendências de todos os colaboradores';
+  carregarGestao();
+}
 
 async function carregarDados(){
   if (!colaboradorAtual) return;
@@ -604,21 +646,27 @@ async function concluirTarefa(tipo, id, btn){
 
 // ---------------- modal / área do gestor ----------------
 const overlay = document.getElementById('modal-overlay');
-document.getElementById('gestor-btn').addEventListener('click', () => {
+const gestorMenuOverlay = document.getElementById('gestor-menu-overlay');
+
+function pedirPinEAbrirMenu(){
   const pin = prompt('PIN do gestor:');
   if (pin === PIN_GESTOR){
-    abrirModal();
+    gestorMenuOverlay.classList.add('open');
   } else if (pin !== null){
     toast('PIN incorreto.');
   }
+}
+document.getElementById('gestor-btn').addEventListener('click', pedirPinEAbrirMenu);
+document.getElementById('add-fab').addEventListener('click', pedirPinEAbrirMenu);
+
+document.getElementById('menu-cancelar').addEventListener('click', () => gestorMenuOverlay.classList.remove('open'));
+document.getElementById('menu-nova-tarefa').addEventListener('click', () => {
+  gestorMenuOverlay.classList.remove('open');
+  abrirModal();
 });
-document.getElementById('add-fab').addEventListener('click', () => {
-  const pin = prompt('PIN do gestor:');
-  if (pin === PIN_GESTOR){
-    abrirModal();
-  } else if (pin !== null){
-    toast('PIN incorreto.');
-  }
+document.getElementById('menu-gestao').addEventListener('click', () => {
+  gestorMenuOverlay.classList.remove('open');
+  abrirGestao();
 });
 
 function abrirModal(){
@@ -679,6 +727,115 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
 // ---------------- inicialização ----------------
 carregarColaboradores();
 setInterval(() => { if (colaboradorAtual) carregarDados(); }, 5 * 60 * 1000);
+
+// ---------------- Gestão de Rotinas (visão do gestor) ----------------
+let itensGestaoAtuais = [];
+
+async function carregarGestao(){
+  const container = document.getElementById('gestao-list');
+  container.innerHTML = '<div class="empty">Carregando...</div>';
+  try{
+    const data = await apiGet({ action: 'getPendencias' });
+    itensGestaoAtuais = data.itens || [];
+    renderGestao();
+  }catch(err){
+    toast('Erro ao carregar pendências.');
+  }
+}
+
+function renderGestao(){
+  const mostrarTodos = document.getElementById('check-mostrar-todos').checked;
+  const container = document.getElementById('gestao-list');
+
+  let itens = itensGestaoAtuais.filter(i => mostrarTodos || i.status !== 'Concluido');
+
+  const pesoPrioridade = { Alta: 0, Media: 1, Baixa: 2 };
+  itens = itens.sort((a,b) => {
+    if (a.status !== b.status) return a.status === 'Concluido' ? 1 : -1;
+    const pa = statusPrazo(a.horarioLimite, a.status).classe === 'atrasado' ? 0 : 1;
+    const pb = statusPrazo(b.horarioLimite, b.status).classe === 'atrasado' ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    const wa = pesoPrioridade[a.prioridade] ?? 3;
+    const wb = pesoPrioridade[b.prioridade] ?? 3;
+    if (wa !== wb) return wa - wb;
+    return paraMinutos(a.horarioLimite) - paraMinutos(b.horarioLimite);
+  });
+
+  if (itens.length === 0){
+    container.innerHTML = '<div class="empty">Nenhuma pendência no momento. 🎉</div>';
+    return;
+  }
+
+  container.innerHTML = itens.map((item, idx) => {
+    const prazo = statusPrazo(item.horarioLimite, item.status);
+    const concluido = item.status === 'Concluido';
+    const atrasado = prazo.classe === 'atrasado' && !concluido;
+    return `
+      <div class="task-card prio-${item.prioridade} ${atrasado ? 'atrasado' : ''} ${concluido ? 'concluido' : ''}">
+        <div class="task-info">
+          <p class="task-title">${escapeHtml(item.tarefa)}</p>
+          <div class="task-meta">
+            <span class="badge" style="background:var(--primary);">${escapeHtml(item.responsavel)}</span>
+            <span class="badge ${item.prioridade}">${item.prioridade === 'Media' ? 'Média' : item.prioridade}</span>
+            <span class="prazo ${prazo.classe}">${prazo.texto}</span>
+          </div>
+        </div>
+        ${atrasado
+          ? `<button class="concluir-btn" style="background:var(--alta);" onclick="cobrarItem('${item.tipo}','${item.id}','${item.responsavel.replace(/'/g, "\\'")}', this)">Cobrar</button>`
+          : (concluido ? '' : '')
+        }
+      </div>
+    `;
+  }).join('');
+}
+
+async function cobrarItem(tipo, id, responsavel, btn){
+  btn.disabled = true;
+  btn.textContent = '...';
+  try{
+    const res = await apiPost({ action: 'cobrar', tipo, id, colaborador: responsavel });
+    if (res.ok){
+      toast('E-mail de cobrança enviado para ' + responsavel);
+      btn.textContent = 'Enviado ✓';
+    }else{
+      toast('Erro: ' + (res.erro || 'não foi possível enviar'));
+      btn.disabled = false;
+      btn.textContent = 'Cobrar';
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+    btn.disabled = false;
+    btn.textContent = 'Cobrar';
+  }
+}
+
+document.getElementById('btn-atualizar-gestao').addEventListener('click', carregarGestao);
+document.getElementById('check-mostrar-todos').addEventListener('change', renderGestao);
+
+document.getElementById('btn-cobrar-todos').addEventListener('click', async () => {
+  const atrasados = itensGestaoAtuais.filter(i => i.status !== 'Concluido' && statusPrazo(i.horarioLimite, i.status).classe === 'atrasado');
+  if (atrasados.length === 0){
+    toast('Nenhum item atrasado no momento.');
+    return;
+  }
+  if (!confirm('Enviar e-mail de cobrança para ' + atrasados.length + ' pendência(s)?')) return;
+
+  const btn = document.getElementById('btn-cobrar-todos');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  let sucesso = 0;
+  for (const item of atrasados){
+    try{
+      const res = await apiPost({ action: 'cobrar', tipo: item.tipo, id: item.id, colaborador: item.responsavel });
+      if (res.ok) sucesso++;
+    }catch(err){ /* segue para o próximo */ }
+  }
+
+  toast(sucesso + ' de ' + atrasados.length + ' e-mails de cobrança enviados.');
+  btn.disabled = false; btn.textContent = '📧 Cobrar todos atrasados';
+  carregarGestao();
+});
+
 </script>
 
 </body>
