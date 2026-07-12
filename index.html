@@ -380,6 +380,7 @@
       <button class="btn-salvar" id="menu-gestao" style="margin-bottom:8px;">📋 Gestão de rotinas (ver todas)</button>
       <button class="btn-salvar" id="menu-cancelar-rotinas" style="margin-bottom:8px; background:var(--muted);">🗑 Cancelar rotina cadastrada</button>
       <button class="btn-salvar" id="menu-calendario" style="margin-bottom:8px; background:#6B3FA0;">📅 Ver calendário</button>
+      <button class="btn-salvar" id="menu-desempenho" style="margin-bottom:8px; background:#1E8E5A;">📊 Desempenho da equipe</button>
       <button class="btn-cancel" id="menu-cancelar">Cancelar</button>
     </div>
   </div>
@@ -504,6 +505,41 @@
     <div id="dia-detalhe-lista"></div>
     <div class="modal-actions">
       <button class="btn-cancel" id="dia-detalhe-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div id="tela-desempenho" style="display:none;">
+  <main style="padding-top:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+      <button class="icon-btn" id="desemp-mes-anterior" style="background:var(--primary); color:#fff;">◀</button>
+      <div class="section-title" id="desemp-mes-label" style="margin:0;">-</div>
+      <button class="icon-btn" id="desemp-mes-seguinte" style="background:var(--primary); color:#fff;">▶</button>
+    </div>
+    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Toque num colaborador para ver o detalhamento tarefa a tarefa do mês.</p>
+    <div id="desempenho-list"><div class="empty">Carregando...</div></div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="desempenho-detalhe-overlay">
+  <div class="modal">
+    <h2 id="desempenho-detalhe-titulo">Detalhamento</h2>
+    <div id="desempenho-detalhe-lista"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="desempenho-detalhe-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="devolver-overlay">
+  <div class="modal">
+    <h2>Devolver tarefa</h2>
+    <p style="color:var(--muted); font-size:13px;">A tarefa volta para "Pendente" e o colaborador precisa refazer. A nota máxima dela passa a ser 75%, menos a penalidade escolhida abaixo.</p>
+    <label>Penalidade (25 a 50%)</label>
+    <input type="number" id="devolver-penalidade" min="0" max="100" value="25">
+    <div class="modal-actions">
+      <button class="btn-cancel" id="devolver-cancelar">Cancelar</button>
+      <button class="btn-salvar" id="devolver-confirmar" style="background:var(--alta);">Devolver</button>
     </div>
   </div>
 </div>
@@ -744,6 +780,7 @@ function ocultarTodasAsTelas(){
   document.getElementById('tela-gestao').style.display = 'none';
   document.getElementById('tela-rotinas').style.display = 'none';
   document.getElementById('tela-calendario').style.display = 'none';
+  document.getElementById('tela-desempenho').style.display = 'none';
 }
 
 function voltarTelaInicial(){
@@ -781,6 +818,15 @@ function abrirCalendario(){
   document.getElementById('header-titulo').textContent = 'Calendário de Rotinas';
   document.getElementById('header-sub').textContent = 'Visão mensal de todas as tarefas';
   carregarCalendario();
+}
+
+function abrirDesempenho(){
+  ocultarTodasAsTelas();
+  document.getElementById('tela-desempenho').style.display = 'block';
+  document.getElementById('voltar-btn').classList.add('show');
+  document.getElementById('header-titulo').textContent = 'Desempenho da Equipe';
+  document.getElementById('header-sub').textContent = 'Histórico mensal de pontuação';
+  carregarDesempenho();
 }
 
 async function carregarDados(){
@@ -846,6 +892,10 @@ document.getElementById('menu-cancelar-rotinas').addEventListener('click', () =>
 document.getElementById('menu-calendario').addEventListener('click', () => {
   gestorMenuOverlay.classList.remove('open');
   abrirCalendario();
+});
+document.getElementById('menu-desempenho').addEventListener('click', () => {
+  gestorMenuOverlay.classList.remove('open');
+  abrirDesempenho();
 });
 
 function abrirModal(){
@@ -1012,6 +1062,8 @@ function renderGestao(){
       if (atrasado){
         botoes += `<button class="concluir-btn" style="background:var(--alta);" onclick="cobrarItem('${item.tipo}','${item.id}','${respSeguro}', this)">⚠ Cobrar</button>`;
       }
+    } else {
+      botoes += `<button class="concluir-btn" style="background:var(--muted);" onclick="abrirDevolver('${item.tipo}','${item.id}','${respSeguro}')">↩ Devolver</button>`;
     }
 
     return `
@@ -1466,6 +1518,143 @@ document.getElementById('cal-mes-seguinte').addEventListener('click', () => {
   calMesAtual++;
   if (calMesAtual > 11){ calMesAtual = 0; calAnoAtual++; }
   renderCalendario();
+});
+
+// ---------------- Desempenho da equipe ----------------
+let desempMesAtual = new Date().getMonth() + 1; // 1-12
+let desempAnoAtual = new Date().getFullYear();
+
+async function carregarDesempenho(){
+  document.getElementById('desemp-mes-label').textContent = NOMES_MESES[desempMesAtual - 1] + ' ' + desempAnoAtual;
+  const container = document.getElementById('desempenho-list');
+  container.innerHTML = '<div class="empty">Carregando...</div>';
+  try{
+    const data = await apiGet({ action: 'getDesempenhoMensal', ano: desempAnoAtual, mes: desempMesAtual });
+    renderDesempenho(data.colaboradores || []);
+  }catch(err){
+    toast('Erro ao carregar desempenho.');
+  }
+}
+
+function corPontuacao(media){
+  if (media >= 90) return 'var(--baixa)';
+  if (media >= 75) return 'var(--media)';
+  return 'var(--alta)';
+}
+
+function renderDesempenho(colaboradores){
+  const container = document.getElementById('desempenho-list');
+  if (colaboradores.length === 0){
+    container.innerHTML = '<div class="empty">Nenhum dado de desempenho nesse mês ainda.</div>';
+    return;
+  }
+
+  container.innerHTML = colaboradores.map(c => `
+    <div class="task-card" style="border-left-color:${corPontuacao(c.mediaPontuacao)}; cursor:pointer;" onclick="abrirDetalheColaborador('${c.nome.replace(/'/g, "\\'")}')">
+      <div class="task-info">
+        <p class="task-title">${escapeHtml(c.nome)}</p>
+        <div class="task-meta">
+          <span class="badge" style="background:${corPontuacao(c.mediaPontuacao)}; color:#1c2430;">${c.mediaPontuacao}%</span>
+          <span class="prazo">${c.concluidas} concluídas</span>
+          <span class="prazo" style="color:var(--alta);">${c.naoConcluidas} não feitas</span>
+          ${c.devolvidas > 0 ? `<span class="prazo" style="color:var(--alta);">${c.devolvidas} devolvida(s)</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function abrirDetalheColaborador(nome){
+  document.getElementById('desempenho-detalhe-titulo').textContent = nome + ' — ' + NOMES_MESES[desempMesAtual - 1] + ' ' + desempAnoAtual;
+  const lista = document.getElementById('desempenho-detalhe-lista');
+  lista.innerHTML = '<div class="empty">Carregando...</div>';
+  document.getElementById('desempenho-detalhe-overlay').classList.add('open');
+
+  try{
+    const data = await apiGet({ action: 'getDesempenhoDetalhe', ano: desempAnoAtual, mes: desempMesAtual, colaborador: nome });
+    const itens = data.itens || [];
+    if (itens.length === 0){
+      lista.innerHTML = '<div class="empty">Nenhum item nesse mês.</div>';
+      return;
+    }
+    lista.innerHTML = itens.map(item => `
+      <div class="task-card" style="border-left-color:${corPontuacao(item.pontuacao)}; margin-bottom:8px;">
+        <div class="task-info">
+          <p class="task-title">${escapeHtml(item.tarefa)}</p>
+          <div class="task-meta">
+            <span class="prazo">${item.data.split('-').reverse().join('/')}</span>
+            <span class="badge" style="background:${corPontuacao(item.pontuacao)}; color:#1c2430;">${item.pontuacao}%</span>
+            <span class="prazo" style="color:var(--muted);">${item.tipo}</span>
+            <span class="prazo" style="color:var(--muted);">${item.status}</span>
+            ${item.devolvida ? '<span class="prazo" style="color:var(--alta);">Devolvida</span>' : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }catch(err){
+    lista.innerHTML = '<div class="empty">Erro ao carregar detalhamento.</div>';
+  }
+}
+
+document.getElementById('desempenho-detalhe-fechar').addEventListener('click', () => {
+  document.getElementById('desempenho-detalhe-overlay').classList.remove('open');
+});
+
+document.getElementById('desemp-mes-anterior').addEventListener('click', () => {
+  desempMesAtual--;
+  if (desempMesAtual < 1){ desempMesAtual = 12; desempAnoAtual--; }
+  carregarDesempenho();
+});
+document.getElementById('desemp-mes-seguinte').addEventListener('click', () => {
+  desempMesAtual++;
+  if (desempMesAtual > 12){ desempMesAtual = 1; desempAnoAtual++; }
+  carregarDesempenho();
+});
+
+// ---------------- Devolver tarefa (usado na tela de Gestão) ----------------
+let devolverContexto = null;
+
+function abrirDevolver(tipo, id, responsavel){
+  devolverContexto = { tipo, id, responsavel };
+  document.getElementById('devolver-penalidade').value = 25;
+  document.getElementById('devolver-overlay').classList.add('open');
+}
+
+document.getElementById('devolver-cancelar').addEventListener('click', () => {
+  document.getElementById('devolver-overlay').classList.remove('open');
+});
+
+document.getElementById('devolver-confirmar').addEventListener('click', async () => {
+  if (!devolverContexto) return;
+  const penalidade = document.getElementById('devolver-penalidade').value;
+  if (!penalidade || Number(penalidade) < 0 || Number(penalidade) > 100){
+    toast('Informe uma penalidade válida.');
+    return;
+  }
+
+  const btn = document.getElementById('devolver-confirmar');
+  btn.disabled = true; btn.textContent = 'Devolvendo...';
+
+  try{
+    const res = await apiPost({
+      action: 'devolverTarefa',
+      tipo: devolverContexto.tipo,
+      id: devolverContexto.id,
+      colaborador: devolverContexto.responsavel,
+      penalidade: penalidade
+    });
+    if (res.ok){
+      toast('Tarefa devolvida. Colaborador foi avisado por e-mail.');
+      document.getElementById('devolver-overlay').classList.remove('open');
+      carregarGestao();
+    }else{
+      toast('Erro: ' + (res.erro || 'não foi possível devolver'));
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Devolver';
+  }
 });
 </script>
 
