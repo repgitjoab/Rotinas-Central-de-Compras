@@ -340,6 +340,7 @@
     font-weight:800;
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -381,6 +382,7 @@
     </div>
     <div id="meudesemp-grafico" style="display:flex; justify-content:center; margin:14px 0;"></div>
     <div id="meudesemp-stats"></div>
+    <button class="concluir-btn" id="btn-meudesemp-detalhe" style="width:100%; margin-top:14px;">🔎 Ver detalhamento (por rotina)</button>
     <div class="modal-actions">
       <button class="btn-cancel" id="meudesemp-fechar">Fechar</button>
     </div>
@@ -398,6 +400,7 @@
       <button class="btn-salvar" id="menu-cancelar-rotinas" style="margin-bottom:8px; background:var(--muted);">🗑 Cancelar rotina cadastrada</button>
       <button class="btn-salvar" id="menu-calendario" style="margin-bottom:8px; background:#6B3FA0;">📅 Ver calendário</button>
       <button class="btn-salvar" id="menu-desempenho" style="margin-bottom:8px; background:#1E8E5A;">📊 Desempenho da equipe</button>
+      <button class="btn-salvar" id="menu-validacao" style="margin-bottom:8px; background:#0E7C86;">✅ Validar Conclusões</button>
       <button class="btn-cancel" id="menu-cancelar">Cancelar</button>
     </div>
   </div>
@@ -537,14 +540,44 @@
       <div class="section-title" id="desemp-mes-label" style="margin:0;">-</div>
       <button class="icon-btn" id="desemp-mes-seguinte" style="background:var(--primary); color:#fff;">▶</button>
     </div>
-    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Toque num colaborador para ver o detalhamento tarefa a tarefa do mês.</p>
+    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Toque num colaborador para ver o detalhamento do mês.</p>
+    <button class="concluir-btn" id="btn-baixar-resumo" style="background:#6B3FA0; width:100%; margin-bottom:14px;">📷 Baixar imagem do resumo</button>
     <div id="desempenho-list"><div class="empty">Carregando...</div></div>
+  </main>
+</div>
+
+<!-- Template usado só para gerar a imagem PNG (fica fora da tela, invisível) -->
+<div id="resumo-imagem-wrapper" style="position:fixed; left:-9999px; top:0;">
+  <div id="resumo-imagem-template" style="width:720px; padding:40px; font-family:Arial, sans-serif; background:linear-gradient(135deg, #0f2670 0%, #17389F 55%, #2b4fc4 100%); color:#fff;">
+    <div style="text-align:center; margin-bottom:6px;">
+      <div style="font-size:13px; letter-spacing:2px; text-transform:uppercase; opacity:.75; font-weight:700;">Central de Compras · Grupo Jorlan</div>
+      <div style="font-size:30px; font-weight:800; margin-top:6px;">🏆 Desempenho do Mês</div>
+      <div id="resumo-img-mes" style="font-size:18px; opacity:.9; margin-top:2px;">-</div>
+    </div>
+    <div style="height:2px; background:rgba(255,255,255,0.25); margin:22px 0;"></div>
+    <div id="resumo-img-lista"></div>
+    <div style="text-align:center; margin-top:28px; font-size:12px; opacity:.6;">Gerado automaticamente pela Ferramenta de Rotinas</div>
+  </div>
+</div>
+
+<div id="tela-validacao" style="display:none;">
+  <main style="padding-top:10px;">
+    <div class="section-title" style="margin-bottom:10px;">Validar Conclusões</div>
+    <p style="color:var(--muted); font-size:13px; margin-top:-6px;">Tudo que os colaboradores marcaram como concluído e ainda não foi confirmado ou devolvido por você.</p>
+    <div style="margin-bottom:14px;">
+      <button class="concluir-btn" id="btn-atualizar-validacao">🔄 Atualizar</button>
+    </div>
+    <div id="validacao-list"><div class="empty">Carregando...</div></div>
   </main>
 </div>
 
 <div class="modal-overlay" id="desempenho-detalhe-overlay">
   <div class="modal">
     <h2 id="desempenho-detalhe-titulo">Detalhamento</h2>
+    <div class="modal-tabs">
+      <div class="modal-tab active" data-view="rotina" id="detalhe-tab-rotina">Por rotina</div>
+      <div class="modal-tab" data-view="dia" id="detalhe-tab-dia">Dia a dia</div>
+    </div>
     <div id="desempenho-detalhe-lista"></div>
     <div class="modal-actions">
       <button class="btn-cancel" id="desempenho-detalhe-fechar">Fechar</button>
@@ -806,6 +839,7 @@ function ocultarTodasAsTelas(){
   document.getElementById('tela-rotinas').style.display = 'none';
   document.getElementById('tela-calendario').style.display = 'none';
   document.getElementById('tela-desempenho').style.display = 'none';
+  document.getElementById('tela-validacao').style.display = 'none';
 }
 
 function voltarTelaInicial(){
@@ -852,6 +886,15 @@ function abrirDesempenho(){
   document.getElementById('header-titulo').textContent = 'Desempenho da Equipe';
   document.getElementById('header-sub').textContent = 'Histórico mensal de pontuação';
   carregarDesempenho();
+}
+
+function abrirValidacao(){
+  ocultarTodasAsTelas();
+  document.getElementById('tela-validacao').style.display = 'block';
+  document.getElementById('voltar-btn').classList.add('show');
+  document.getElementById('header-titulo').textContent = 'Validar Conclusões';
+  document.getElementById('header-sub').textContent = 'Confirme ou devolva o que foi marcado como concluído';
+  carregarValidacoes();
 }
 
 async function carregarDados(){
@@ -921,6 +964,10 @@ document.getElementById('menu-calendario').addEventListener('click', () => {
 document.getElementById('menu-desempenho').addEventListener('click', () => {
   gestorMenuOverlay.classList.remove('open');
   abrirDesempenho();
+});
+document.getElementById('menu-validacao').addEventListener('click', () => {
+  gestorMenuOverlay.classList.remove('open');
+  abrirValidacao();
 });
 
 function abrirModal(){
@@ -1563,6 +1610,7 @@ document.getElementById('cal-mes-seguinte').addEventListener('click', () => {
 // ---------------- Desempenho da equipe ----------------
 let desempMesAtual = new Date().getMonth() + 1; // 1-12
 let desempAnoAtual = new Date().getFullYear();
+let desempenhoColaboradoresAtuais = [];
 
 async function carregarDesempenho(){
   document.getElementById('desemp-mes-label').textContent = NOMES_MESES[desempMesAtual - 1] + ' ' + desempAnoAtual;
@@ -1570,7 +1618,8 @@ async function carregarDesempenho(){
   container.innerHTML = '<div class="empty">Carregando...</div>';
   try{
     const data = await apiGet({ action: 'getDesempenhoMensal', ano: desempAnoAtual, mes: desempMesAtual });
-    renderDesempenho(data.colaboradores || []);
+    desempenhoColaboradoresAtuais = data.colaboradores || [];
+    renderDesempenho(desempenhoColaboradoresAtuais);
   }catch(err){
     toast('Erro ao carregar desempenho.');
   }
@@ -1604,33 +1653,95 @@ function renderDesempenho(colaboradores){
   `).join('');
 }
 
-async function abrirDetalheColaborador(nome){
-  document.getElementById('desempenho-detalhe-titulo').textContent = nome + ' — ' + NOMES_MESES[desempMesAtual - 1] + ' ' + desempAnoAtual;
+let detalheItensAtuais = [];
+let detalheViewAtual = 'rotina';
+
+function agruparPorRotina(itens){
+  const grupos = {};
+  itens.forEach(item => {
+    if (!grupos[item.tarefa]){
+      grupos[item.tarefa] = { tarefa: item.tarefa, soma: 0, total: 0, concluidas: 0, naoConcluidas: 0, pior: null };
+    }
+    const g = grupos[item.tarefa];
+    g.soma += item.pontuacao;
+    g.total += 1;
+    if (item.status === 'Concluido') g.concluidas++; else g.naoConcluidas++;
+    if (!g.pior || item.pontuacao < g.pior.pontuacao){
+      g.pior = { data: item.data, pontuacao: item.pontuacao };
+    }
+  });
+  return Object.values(grupos)
+    .map(g => ({ ...g, media: g.total > 0 ? Math.round((g.soma / g.total) * 10) / 10 : 0 }))
+    .sort((a,b) => a.media - b.media); // pior rotina primeiro, pra chamar atenção
+}
+
+function renderDetalhePorRotina(itens){
+  const grupos = agruparPorRotina(itens);
+  return grupos.map(g => `
+    <div class="task-card" style="border-left-color:${corPontuacao(g.media)}; margin-bottom:8px;">
+      <div class="task-info">
+        <p class="task-title">${escapeHtml(g.tarefa)}</p>
+        <div class="task-meta">
+          <span class="badge" style="background:${corPontuacao(g.media)}; color:#1c2430;">${g.media}% média</span>
+          <span class="prazo">${g.concluidas}/${g.total} concluídas</span>
+          ${g.pior ? `<span class="prazo" style="color:var(--alta);">pior dia: ${g.pior.data.split('-').reverse().join('/')} (${g.pior.pontuacao}%)</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDetalhePorDia(itens){
+  const ordenado = [...itens].sort((a,b) => a.data.localeCompare(b.data));
+  return ordenado.map(item => `
+    <div class="task-card" style="border-left-color:${corPontuacao(item.pontuacao)}; margin-bottom:8px;">
+      <div class="task-info">
+        <p class="task-title">${escapeHtml(item.tarefa)}</p>
+        <div class="task-meta">
+          <span class="prazo">${item.data.split('-').reverse().join('/')}</span>
+          <span class="badge" style="background:${corPontuacao(item.pontuacao)}; color:#1c2430;">${item.pontuacao}%</span>
+          <span class="prazo" style="color:var(--muted);">${item.tipo}</span>
+          <span class="prazo" style="color:var(--muted);">${item.status}</span>
+          ${item.devolvida ? '<span class="prazo" style="color:var(--alta);">Devolvida</span>' : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDetalheAtual(){
+  const lista = document.getElementById('desempenho-detalhe-lista');
+  if (detalheItensAtuais.length === 0){
+    lista.innerHTML = '<div class="empty">Nenhum item nesse mês.</div>';
+    return;
+  }
+  lista.innerHTML = detalheViewAtual === 'rotina' ? renderDetalhePorRotina(detalheItensAtuais) : renderDetalhePorDia(detalheItensAtuais);
+}
+
+document.querySelectorAll('#detalhe-tab-rotina, #detalhe-tab-dia').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#detalhe-tab-rotina, #detalhe-tab-dia').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    detalheViewAtual = tab.dataset.view;
+    renderDetalheAtual();
+  });
+});
+
+async function abrirDetalheColaborador(nome, anoParam, mesParam){
+  const ano = anoParam || desempAnoAtual;
+  const mes = mesParam || desempMesAtual;
+  document.getElementById('desempenho-detalhe-titulo').textContent = nome + ' — ' + NOMES_MESES[mes - 1] + ' ' + ano;
   const lista = document.getElementById('desempenho-detalhe-lista');
   lista.innerHTML = '<div class="empty">Carregando...</div>';
+  detalheViewAtual = 'rotina';
+  document.querySelectorAll('#detalhe-tab-rotina, #detalhe-tab-dia').forEach(t => t.classList.remove('active'));
+  document.getElementById('detalhe-tab-rotina').classList.add('active');
   document.getElementById('desempenho-detalhe-overlay').classList.add('open');
 
   try{
-    const data = await apiGet({ action: 'getDesempenhoDetalhe', ano: desempAnoAtual, mes: desempMesAtual, colaborador: nome });
-    const itens = data.itens || [];
-    if (itens.length === 0){
-      lista.innerHTML = '<div class="empty">Nenhum item nesse mês.</div>';
-      return;
-    }
-    lista.innerHTML = itens.map(item => `
-      <div class="task-card" style="border-left-color:${corPontuacao(item.pontuacao)}; margin-bottom:8px;">
-        <div class="task-info">
-          <p class="task-title">${escapeHtml(item.tarefa)}</p>
-          <div class="task-meta">
-            <span class="prazo">${item.data.split('-').reverse().join('/')}</span>
-            <span class="badge" style="background:${corPontuacao(item.pontuacao)}; color:#1c2430;">${item.pontuacao}%</span>
-            <span class="prazo" style="color:var(--muted);">${item.tipo}</span>
-            <span class="prazo" style="color:var(--muted);">${item.status}</span>
-            ${item.devolvida ? '<span class="prazo" style="color:var(--alta);">Devolvida</span>' : ''}
-          </div>
-        </div>
-      </div>
-    `).join('');
+    const data = await apiGet({ action: 'getDesempenhoDetalhe', ano: ano, mes: mes, colaborador: nome });
+    detalheItensAtuais = data.itens || [];
+    renderDetalheAtual();
   }catch(err){
     lista.innerHTML = '<div class="empty">Erro ao carregar detalhamento.</div>';
   }
@@ -1651,13 +1762,18 @@ document.getElementById('desemp-mes-seguinte').addEventListener('click', () => {
   carregarDesempenho();
 });
 
-// ---------------- Devolver tarefa (usado na tela de Gestão) ----------------
+// ---------------- Devolver tarefa (usado na Gestão e na Validação) ----------------
 let devolverContexto = null;
 
-function abrirDevolver(tipo, id, responsavel){
-  devolverContexto = { tipo, id, responsavel };
+function abrirDevolver(tipo, id, responsavel, data){
+  devolverContexto = { tipo, id, responsavel, data: data || hojeStrCliente() };
   document.getElementById('devolver-penalidade').value = 25;
   document.getElementById('devolver-overlay').classList.add('open');
+}
+
+function hojeStrCliente(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
 document.getElementById('devolver-cancelar').addEventListener('click', () => {
@@ -1681,12 +1797,17 @@ document.getElementById('devolver-confirmar').addEventListener('click', async ()
       tipo: devolverContexto.tipo,
       id: devolverContexto.id,
       colaborador: devolverContexto.responsavel,
-      penalidade: penalidade
+      penalidade: penalidade,
+      data: devolverContexto.data
     });
     if (res.ok){
       toast('Tarefa devolvida. Colaborador foi avisado por e-mail.');
       document.getElementById('devolver-overlay').classList.remove('open');
-      carregarGestao();
+      if (document.getElementById('tela-validacao').style.display === 'block'){
+        carregarValidacoes();
+      } else {
+        carregarGestao();
+      }
     }else{
       toast('Erro: ' + (res.erro || 'não foi possível devolver'));
     }
@@ -1709,6 +1830,9 @@ document.getElementById('btn-meu-desempenho').addEventListener('click', () => {
 });
 document.getElementById('meudesemp-fechar').addEventListener('click', () => {
   document.getElementById('meu-desempenho-overlay').classList.remove('open');
+});
+document.getElementById('btn-meudesemp-detalhe').addEventListener('click', () => {
+  abrirDetalheColaborador(colaboradorAtual, meuDesempAno, meuDesempMes);
 });
 document.getElementById('meudesemp-mes-anterior').addEventListener('click', () => {
   meuDesempMes--;
@@ -1767,6 +1891,117 @@ async function carregarMeuDesempenho(){
     statsEl.innerHTML = '<div class="empty">Erro ao carregar desempenho.</div>';
   }
 }
+
+// ---------------- Validar Conclusões ----------------
+async function carregarValidacoes(){
+  const container = document.getElementById('validacao-list');
+  container.innerHTML = '<div class="empty">Carregando...</div>';
+  try{
+    const data = await apiGet({ action: 'listarValidacoes' });
+    renderValidacoes(data.itens || []);
+  }catch(err){
+    toast('Erro ao carregar validações.');
+  }
+}
+
+function renderValidacoes(itens){
+  const container = document.getElementById('validacao-list');
+  if (itens.length === 0){
+    container.innerHTML = '<div class="empty">Nada aguardando validação. 🎉</div>';
+    return;
+  }
+
+  container.innerHTML = itens.map(item => {
+    const respSeguro = attrSafe(item.responsavel);
+    return `
+      <div class="task-card">
+        <div class="task-info">
+          <p class="task-title">${escapeHtml(item.tarefa)}</p>
+          <div class="task-meta">
+            <span class="badge" style="background:var(--primary);">${escapeHtml(item.responsavel)}</span>
+            <span class="prazo">${item.data.split('-').reverse().join('/')} às ${item.horaConclusao}</span>
+            <span class="badge" style="background:${corPontuacao(item.pontuacao)}; color:#1c2430;">${item.pontuacao}%</span>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button class="concluir-btn" style="background:var(--baixa);" onclick="confirmarItemValidacao('${item.tipo}','${item.id}','${item.data}', this)">✅ Confirmar</button>
+          <button class="concluir-btn" style="background:var(--muted);" onclick="abrirDevolver('${item.tipo}','${item.id}','${respSeguro}','${item.data}')">↩ Devolver</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function confirmarItemValidacao(tipo, id, data, btn){
+  btn.disabled = true;
+  btn.textContent = '...';
+  try{
+    const res = await apiPost({ action: 'confirmarValidacao', tipo, id, data });
+    if (res.ok){
+      toast('Conclusão confirmada.');
+      carregarValidacoes();
+    }else{
+      toast('Erro: ' + (res.erro || 'não foi possível confirmar'));
+      btn.disabled = false;
+      btn.textContent = '✅ Confirmar';
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+    btn.disabled = false;
+    btn.textContent = '✅ Confirmar';
+  }
+}
+
+document.getElementById('btn-atualizar-validacao').addEventListener('click', carregarValidacoes);
+
+// ---------------- Baixar imagem-resumo do mês (para compartilhar) ----------------
+function popularImagemResumo(colaboradores){
+  document.getElementById('resumo-img-mes').textContent = NOMES_MESES[desempMesAtual - 1] + ' de ' + desempAnoAtual;
+  const medalhas = ['🥇', '🥈', '🥉'];
+
+  document.getElementById('resumo-img-lista').innerHTML = colaboradores.map((c, idx) => {
+    const cor = corPontuacao(c.mediaPontuacao);
+    const marcador = idx < 3 ? medalhas[idx] : (idx + 1) + 'º';
+    return `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:17px; font-weight:700;">
+          <span>${marcador} ${escapeHtml(c.nome)}</span>
+          <span>${c.mediaPontuacao}%</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.2); border-radius:8px; height:14px; overflow:hidden;">
+          <div style="width:${Math.max(2, Math.min(100, c.mediaPontuacao))}%; height:100%; background:${cor}; border-radius:8px;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('btn-baixar-resumo').addEventListener('click', async () => {
+  if (!desempenhoColaboradoresAtuais || desempenhoColaboradoresAtuais.length === 0){
+    toast('Nenhum dado de desempenho pra gerar imagem ainda.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-baixar-resumo');
+  btn.disabled = true; btn.textContent = 'Gerando imagem...';
+
+  try{
+    popularImagemResumo(desempenhoColaboradoresAtuais);
+    const el = document.getElementById('resumo-imagem-template');
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true });
+    const link = document.createElement('a');
+    link.download = 'desempenho-' + NOMES_MESES[desempMesAtual - 1].toLowerCase() + '-' + desempAnoAtual + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast('Imagem baixada!');
+  }catch(err){
+    toast('Erro ao gerar a imagem.');
+  }finally{
+    btn.disabled = false; btn.textContent = '📷 Baixar imagem do resumo';
+  }
+});
 </script>
 
 </body>
