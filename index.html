@@ -363,12 +363,29 @@
 </div>
 
 <main id="tela-tarefas" style="display:none">
+  <button class="concluir-btn" id="btn-meu-desempenho" style="background:#1E8E5A; margin-bottom:16px; width:100%;">📊 Meu desempenho do mês</button>
+
   <div class="section-title">Rotinas diárias</div>
   <div id="rotinas-list"><div class="empty">Carregando...</div></div>
 
   <div class="section-title">Tarefas de hoje</div>
   <div id="tarefas-list"><div class="empty">Carregando...</div></div>
 </main>
+
+<div class="modal-overlay" id="meu-desempenho-overlay">
+  <div class="modal">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <button class="icon-btn" id="meudesemp-mes-anterior" style="background:var(--primary); color:#fff;">◀</button>
+      <h2 id="meudesemp-mes-label" style="margin:0; font-size:16px;">-</h2>
+      <button class="icon-btn" id="meudesemp-mes-seguinte" style="background:var(--primary); color:#fff;">▶</button>
+    </div>
+    <div id="meudesemp-grafico" style="display:flex; justify-content:center; margin:14px 0;"></div>
+    <div id="meudesemp-stats"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="meudesemp-fechar">Fechar</button>
+    </div>
+  </div>
+</div>
 
 <button class="fab" id="add-fab" title="Área do gestor">+</button>
 
@@ -1656,6 +1673,77 @@ document.getElementById('devolver-confirmar').addEventListener('click', async ()
     btn.disabled = false; btn.textContent = 'Devolver';
   }
 });
+
+// ---------------- Meu desempenho (visão do colaborador) ----------------
+let meuDesempMes = new Date().getMonth() + 1;
+let meuDesempAno = new Date().getFullYear();
+
+document.getElementById('btn-meu-desempenho').addEventListener('click', () => {
+  meuDesempMes = new Date().getMonth() + 1;
+  meuDesempAno = new Date().getFullYear();
+  document.getElementById('meu-desempenho-overlay').classList.add('open');
+  carregarMeuDesempenho();
+});
+document.getElementById('meudesemp-fechar').addEventListener('click', () => {
+  document.getElementById('meu-desempenho-overlay').classList.remove('open');
+});
+document.getElementById('meudesemp-mes-anterior').addEventListener('click', () => {
+  meuDesempMes--;
+  if (meuDesempMes < 1){ meuDesempMes = 12; meuDesempAno--; }
+  carregarMeuDesempenho();
+});
+document.getElementById('meudesemp-mes-seguinte').addEventListener('click', () => {
+  meuDesempMes++;
+  if (meuDesempMes > 12){ meuDesempMes = 1; meuDesempAno++; }
+  carregarMeuDesempenho();
+});
+
+function renderDonutSVG(percentual, cor){
+  const raio = 50;
+  const circunferencia = 2 * Math.PI * raio;
+  const offset = circunferencia * (1 - percentual / 100);
+  return `
+    <svg width="160" height="160" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="${raio}" fill="none" stroke="var(--border)" stroke-width="12"></circle>
+      <circle cx="60" cy="60" r="${raio}" fill="none" stroke="${cor}" stroke-width="12"
+        stroke-dasharray="${circunferencia}" stroke-dashoffset="${offset}"
+        stroke-linecap="round" transform="rotate(-90 60 60)"></circle>
+      <text x="60" y="66" text-anchor="middle" font-size="24" font-weight="800" fill="var(--text)">${Math.round(percentual)}%</text>
+    </svg>
+  `;
+}
+
+async function carregarMeuDesempenho(){
+  document.getElementById('meudesemp-mes-label').textContent = NOMES_MESES[meuDesempMes - 1] + ' ' + meuDesempAno;
+  const graficoEl = document.getElementById('meudesemp-grafico');
+  const statsEl = document.getElementById('meudesemp-stats');
+  graficoEl.innerHTML = '<div class="empty">Carregando...</div>';
+  statsEl.innerHTML = '';
+
+  try{
+    const data = await apiGet({ action: 'getDesempenhoMensal', ano: meuDesempAno, mes: meuDesempMes });
+    const meuDado = (data.colaboradores || []).find(c => c.nome === colaboradorAtual);
+
+    if (!meuDado){
+      graficoEl.innerHTML = renderDonutSVG(0, 'var(--muted)');
+      statsEl.innerHTML = '<div class="empty">Nenhuma tarefa registrada nesse mês ainda.</div>';
+      return;
+    }
+
+    graficoEl.innerHTML = renderDonutSVG(meuDado.mediaPontuacao, corPontuacao(meuDado.mediaPontuacao));
+    statsEl.innerHTML = `
+      <div style="display:flex; justify-content:center; gap:18px; flex-wrap:wrap; font-size:13px; text-align:center;">
+        <div><b style="font-size:18px; color:var(--baixa);">${meuDado.concluidas}</b><br><span style="color:var(--muted);">concluídas</span></div>
+        <div><b style="font-size:18px; color:var(--alta);">${meuDado.naoConcluidas}</b><br><span style="color:var(--muted);">não feitas</span></div>
+        ${meuDado.devolvidas > 0 ? `<div><b style="font-size:18px; color:var(--alta);">${meuDado.devolvidas}</b><br><span style="color:var(--muted);">devolvidas</span></div>` : ''}
+        <div><b style="font-size:18px;">${meuDado.total}</b><br><span style="color:var(--muted);">no total</span></div>
+      </div>
+    `;
+  }catch(err){
+    graficoEl.innerHTML = '';
+    statsEl.innerHTML = '<div class="empty">Erro ao carregar desempenho.</div>';
+  }
+}
 </script>
 
 </body>
