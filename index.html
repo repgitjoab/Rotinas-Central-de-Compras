@@ -493,6 +493,10 @@
       </div>
     </div>
 
+    <label style="margin-top:14px;">Válida a partir de (opcional)</label>
+    <input type="date" id="editar-data-inicio-vigencia">
+    <p style="font-size:11px; color:var(--muted); margin:6px 0 0;">Deixe em branco pra valer já.</p>
+
     <div class="modal-actions">
       <button class="btn-cancel" id="editar-cancelar">Cancelar</button>
       <button class="btn-salvar" id="editar-salvar">Salvar alterações</button>
@@ -627,6 +631,10 @@
         </div>
       </div>
       <p id="intervalo-semanas-dica" style="display:none; font-size:11px; color:var(--muted); margin:6px 0 0;">Ex: pra "uma semana sim, uma não", coloque 2 e escolha qualquer segunda-feira em que a rotina DEVE acontecer.</p>
+
+      <label style="margin-top:14px;">Válida a partir de (opcional)</label>
+      <input type="date" id="input-data-inicio-vigencia">
+      <p style="font-size:11px; color:var(--muted); margin:6px 0 0;">Deixe em branco pra valer já. Preencha se essa rotina só deve começar numa data futura (ex: cadastrar hoje uma rotina que só começa na próxima segunda).</p>
     </div>
 
     <div class="modal-actions">
@@ -929,6 +937,7 @@ function abrirModal(){
   document.getElementById('intervalo-semanas-dica').style.display = 'none';
   document.getElementById('input-intervalo-semanas').value = '';
   document.getElementById('input-data-referencia').value = '';
+  document.getElementById('input-data-inicio-vigencia').value = '';
   overlay.classList.add('open');
 }
 document.getElementById('modal-cancelar').addEventListener('click', () => overlay.classList.remove('open'));
@@ -970,6 +979,7 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
   const usaIntervalo = document.getElementById('input-usa-intervalo').checked;
   const intervaloSemanas = document.getElementById('input-intervalo-semanas').value;
   const dataReferencia = document.getElementById('input-data-referencia').value;
+  const dataInicioVigencia = document.getElementById('input-data-inicio-vigencia').value;
 
   if (!tarefa || !responsavel || !horario){
     toast('Preencha todos os campos.');
@@ -1003,6 +1013,9 @@ document.getElementById('modal-salvar').addEventListener('click', async () => {
       if (usaIntervalo){
         payload.intervaloSemanas = intervaloSemanas;
         payload.dataReferencia = dataReferencia;
+      }
+      if (dataInicioVigencia){
+        payload.dataInicioVigencia = dataInicioVigencia;
       }
       res = await apiPost(payload);
     }
@@ -1209,6 +1222,7 @@ function renderRotinasCadastradas(rotinas){
           ${(r.diaInicio && r.diaFim) ? `<span class="prazo" style="color:var(--primary);">Dia ${r.diaInicio} ao ${r.diaFim} do mês</span>` : ''}
           ${r.diasSemana ? `<span class="prazo" style="color:var(--primary);">${escapeHtml(r.diasSemana)}</span>` : ''}
           ${(r.intervaloSemanas && r.dataReferencia) ? `<span class="prazo" style="color:var(--primary);">a cada ${r.intervaloSemanas} semanas</span>` : ''}
+          ${r.dataInicioVigencia ? `<span class="prazo" style="color:var(--primary);">válida a partir de ${r.dataInicioVigencia.split('-').reverse().join('/')}</span>` : ''}
           ${!r.ativo ? '<span class="prazo" style="color:var(--muted);">Cancelada</span>' : ''}
         </div>
       </div>
@@ -1279,6 +1293,7 @@ function abrirEditarRotina(id, listaOrigem){
   document.getElementById('editar-intervalo-semanas-campos').style.display = temIntervalo ? 'flex' : 'none';
   document.getElementById('editar-intervalo-semanas').value = rotina.intervaloSemanas || '';
   document.getElementById('editar-data-referencia').value = rotina.dataReferencia || '';
+  document.getElementById('editar-data-inicio-vigencia').value = rotina.dataInicioVigencia || '';
 
   document.getElementById('dia-detalhe-overlay').classList.remove('open');
   editarOverlay.classList.add('open');
@@ -1313,6 +1328,7 @@ document.getElementById('editar-salvar').addEventListener('click', async () => {
   const usaIntervalo = document.getElementById('editar-usa-intervalo').checked;
   const intervaloSemanas = document.getElementById('editar-intervalo-semanas').value;
   const dataReferencia = document.getElementById('editar-data-referencia').value;
+  const dataInicioVigencia = document.getElementById('editar-data-inicio-vigencia').value;
 
   if (!tarefa || !responsavel || !horarioLimite){
     toast('Preencha todos os campos.');
@@ -1339,7 +1355,8 @@ document.getElementById('editar-salvar').addEventListener('click', async () => {
       diaFim: usaPeriodo ? diaFim : '',
       diasSemana: diasSemana,
       intervaloSemanas: usaIntervalo ? intervaloSemanas : '',
-      dataReferencia: usaIntervalo ? dataReferencia : ''
+      dataReferencia: usaIntervalo ? dataReferencia : '',
+      dataInicioVigencia: dataInicioVigencia
     });
     if (res.ok){
       toast('Rotina atualizada!');
@@ -1420,6 +1437,11 @@ function semanaValidaCliente(dataReferencia, intervaloSemanas, date){
   return resto === 0;
 }
 
+function vigenciaValidaCliente(dataInicioVigencia, dataStr){
+  if (!dataInicioVigencia) return true;
+  return dataStr >= dataInicioVigencia;
+}
+
 function itensDoDiaCalendario(dia, dataStr, diaSemana){
   const itens = [];
   if (diaSemana !== 0 && diaSemana !== 6){
@@ -1428,7 +1450,8 @@ function itensDoDiaCalendario(dia, dataStr, diaSemana){
       if (r.ativo
           && rotinaValidaNoDiaCliente(r.diaInicio, r.diaFim, dia)
           && diaSemanaValidoCliente(r.diasSemana, diaSemana)
-          && semanaValidaCliente(r.dataReferencia, r.intervaloSemanas, dataDoItem)){
+          && semanaValidaCliente(r.dataReferencia, r.intervaloSemanas, dataDoItem)
+          && vigenciaValidaCliente(r.dataInicioVigencia, dataStr)){
         itens.push({ id: r.id, tarefa: r.tarefa, responsavel: r.responsavel, prioridade: r.prioridade, horarioLimite: r.horarioLimite, tipo: 'Rotina diária' });
       }
     });
