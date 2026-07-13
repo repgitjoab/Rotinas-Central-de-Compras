@@ -747,6 +747,7 @@ function renderLista(containerId, itens, tipo){
   container.innerHTML = ordenado.map(item => {
     const prazo = statusPrazo(item.horarioLimite, item.status);
     const concluido = item.status === 'Concluido';
+    const temPeriodo = item.diaInicio && item.diaFim;
     return `
       <div class="task-card prio-${item.prioridade} ${prazo.classe === 'atrasado' && !concluido ? 'atrasado' : ''} ${concluido ? 'concluido' : ''}">
         <div class="task-info">
@@ -754,6 +755,8 @@ function renderLista(containerId, itens, tipo){
           <div class="task-meta">
             <span class="badge ${item.prioridade}">${item.prioridade === 'Media' ? 'Média' : item.prioridade}</span>
             <span class="prazo ${prazo.classe}">${prazo.texto}</span>
+            ${temPeriodo ? `<span class="prazo" style="color:var(--primary);">Vale do dia ${item.diaInicio} ao dia ${item.diaFim}</span>` : ''}
+            ${item.diasSemana ? `<span class="prazo" style="color:var(--primary);">${escapeHtml(item.diasSemana)}</span>` : ''}
           </div>
         </div>
         <button class="concluir-btn" ${concluido ? 'disabled' : ''} onclick="concluirTarefa('${tipo}', '${item.id}', this)">
