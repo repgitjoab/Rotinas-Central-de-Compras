@@ -715,9 +715,34 @@ function paraMinutos(hhmm){
   const [h,m] = hhmm.split(':').map(Number);
   return h*60+m;
 }
-function statusPrazo(horarioLimite, status){
+function formatarDataLocalCliente(date){
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,'0');
+  const d = String(date.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + d;
+}
+
+function statusPrazo(horarioLimite, status, dataLimitePeriodo){
   if (status === 'Concluido') return { classe:'', texto:'Concluído' };
   const agora = new Date();
+
+  if (dataLimitePeriodo){
+    // rotina de período (ex: dia 1 ao 5): o prazo real é a data final + horário,
+    // não o fim de cada dia dentro da janela.
+    const [ano, mes, dia] = dataLimitePeriodo.split('-').map(Number);
+    const [h, m] = horarioLimite.split(':').map(Number);
+    const limite = new Date(ano, mes - 1, dia, h, m);
+    const diffMs = limite - agora;
+    const diffMin = Math.round(diffMs / 60000);
+    const dataFormatada = dataLimitePeriodo.split('-').reverse().join('/');
+
+    if (diffMin < 0) return { classe:'atrasado', texto:'Atrasado — prazo final era ' + dataFormatada + ' às ' + horarioLimite };
+    if (dataLimitePeriodo === formatarDataLocalCliente(agora) && diffMin <= 60){
+      return { classe:'proximo', texto:'Vence hoje às ' + horarioLimite + ' (em ' + diffMin + ' min)' };
+    }
+    return { classe:'', texto:'Vale até ' + dataFormatada + ' às ' + horarioLimite };
+  }
+
   const agoraMin = agora.getHours()*60 + agora.getMinutes();
   const limiteMin = paraMinutos(horarioLimite);
   const diff = limiteMin - agoraMin;
@@ -745,9 +770,8 @@ function renderLista(containerId, itens, tipo){
   });
 
   container.innerHTML = ordenado.map(item => {
-    const prazo = statusPrazo(item.horarioLimite, item.status);
+    const prazo = statusPrazo(item.horarioLimite, item.status, item.dataLimitePeriodo);
     const concluido = item.status === 'Concluido';
-    const temPeriodo = item.diaInicio && item.diaFim;
     return `
       <div class="task-card prio-${item.prioridade} ${prazo.classe === 'atrasado' && !concluido ? 'atrasado' : ''} ${concluido ? 'concluido' : ''}">
         <div class="task-info">
@@ -755,7 +779,6 @@ function renderLista(containerId, itens, tipo){
           <div class="task-meta">
             <span class="badge ${item.prioridade}">${item.prioridade === 'Media' ? 'Média' : item.prioridade}</span>
             <span class="prazo ${prazo.classe}">${prazo.texto}</span>
-            ${temPeriodo ? `<span class="prazo" style="color:var(--primary);">Vale do dia ${item.diaInicio} ao dia ${item.diaFim}</span>` : ''}
             ${item.diasSemana ? `<span class="prazo" style="color:var(--primary);">${escapeHtml(item.diasSemana)}</span>` : ''}
           </div>
         </div>
@@ -1109,8 +1132,8 @@ function renderGestao(){
   const pesoPrioridade = { Alta: 0, Media: 1, Baixa: 2 };
   itens = itens.sort((a,b) => {
     if (a.status !== b.status) return a.status === 'Concluido' ? 1 : -1;
-    const pa = statusPrazo(a.horarioLimite, a.status).classe === 'atrasado' ? 0 : 1;
-    const pb = statusPrazo(b.horarioLimite, b.status).classe === 'atrasado' ? 0 : 1;
+    const pa = statusPrazo(a.horarioLimite, a.status, a.dataLimitePeriodo).classe === 'atrasado' ? 0 : 1;
+    const pb = statusPrazo(b.horarioLimite, b.status, b.dataLimitePeriodo).classe === 'atrasado' ? 0 : 1;
     if (pa !== pb) return pa - pb;
     const wa = pesoPrioridade[a.prioridade] ?? 3;
     const wb = pesoPrioridade[b.prioridade] ?? 3;
@@ -1124,7 +1147,7 @@ function renderGestao(){
   }
 
   container.innerHTML = itens.map((item, idx) => {
-    const prazo = statusPrazo(item.horarioLimite, item.status);
+    const prazo = statusPrazo(item.horarioLimite, item.status, item.dataLimitePeriodo);
     const concluido = item.status === 'Concluido';
     const atrasado = prazo.classe === 'atrasado' && !concluido;
     const respSeguro = attrSafe(item.responsavel);
@@ -1136,7 +1159,8 @@ function renderGestao(){
         botoes += `<button class="concluir-btn" style="background:var(--alta);" onclick="cobrarItem('${item.tipo}','${item.id}','${respSeguro}', this)">⚠ Cobrar</button>`;
       }
     } else {
-      botoes += `<button class="concluir-btn" style="background:var(--muted);" onclick="abrirDevolver('${item.tipo}','${item.id}','${respSeguro}')">↩ Devolver</button>`;
+      const dataParaDevolver = item.dataLimitePeriodo || '';
+      botoes += `<button class="concluir-btn" style="background:var(--muted);" onclick="abrirDevolver('${item.tipo}','${item.id}','${respSeguro}','${dataParaDevolver}')">↩ Devolver</button>`;
     }
 
     return `
@@ -1204,7 +1228,7 @@ document.getElementById('check-mostrar-todos').addEventListener('change', render
 document.getElementById('check-ignorar-periodo').addEventListener('change', carregarGestao);
 
 document.getElementById('btn-cobrar-todos').addEventListener('click', async () => {
-  const atrasados = itensGestaoAtuais.filter(i => i.status !== 'Concluido' && statusPrazo(i.horarioLimite, i.status).classe === 'atrasado');
+  const atrasados = itensGestaoAtuais.filter(i => i.status !== 'Concluido' && statusPrazo(i.horarioLimite, i.status, i.dataLimitePeriodo).classe === 'atrasado');
   if (atrasados.length === 0){
     toast('Nenhum item atrasado no momento.');
     return;
