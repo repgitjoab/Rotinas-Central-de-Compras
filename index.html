@@ -366,6 +366,15 @@
 </div>
 
 <main id="tela-tarefas" style="display:none">
+  <div id="ponto-card" style="background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; margin-bottom:16px;">
+    <div style="font-weight:700; font-size:14px; margin-bottom:2px;">🕐 Ponto de hoje</div>
+    <div id="ponto-status" style="font-size:12px; color:var(--muted); margin-bottom:10px;">Carregando...</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="concluir-btn" id="btn-ponto-entrada" style="flex:1;">Bater entrada</button>
+      <button class="concluir-btn" id="btn-ponto-saida" style="flex:1; background:var(--muted);">Bater saída</button>
+    </div>
+  </div>
+
   <button class="concluir-btn" id="btn-meu-desempenho" style="background:#1E8E5A; margin-bottom:16px; width:100%;">📊 Meu desempenho do mês</button>
 
   <div class="section-title">Rotinas diárias</div>
@@ -849,6 +858,7 @@ function selecionarColaborador(nome){
   document.getElementById('header-titulo').textContent = nome;
   document.getElementById('header-sub').textContent = 'Rotinas e tarefas de hoje';
   carregarDados();
+  carregarPontoHoje();
 }
 
 function ocultarTodasAsTelas(){
@@ -1638,7 +1648,8 @@ async function carregarDesempenho(){
   container.innerHTML = '<div class="empty">Carregando...</div>';
   try{
     const data = await apiGet({ action: 'getDesempenhoMensal', ano: desempAnoAtual, mes: desempMesAtual });
-    desempenhoColaboradoresAtuais = data.colaboradores || [];
+    // colaboradores marcados com ExcluirRanking não aparecem no ranking da equipe
+    desempenhoColaboradoresAtuais = (data.colaboradores || []).filter(c => !c.excluidoRanking);
     renderDesempenho(desempenhoColaboradoresAtuais);
   }catch(err){
     toast('Erro ao carregar desempenho.');
@@ -2098,6 +2109,78 @@ document.getElementById('btn-baixar-resumo').addEventListener('click', async () 
     toast('Erro ao gerar a imagem.');
   }finally{
     btn.disabled = false; btn.textContent = '📷 Baixar imagem do resumo';
+  }
+});
+
+// ---------------- Ponto (entrada/saída) ----------------
+async function carregarPontoHoje(){
+  const statusEl = document.getElementById('ponto-status');
+  const btnEntrada = document.getElementById('btn-ponto-entrada');
+  const btnSaida = document.getElementById('btn-ponto-saida');
+  statusEl.textContent = 'Carregando...';
+  try{
+    const data = await apiGet({ action: 'getPontoHoje', colaborador: colaboradorAtual });
+
+    if (data.ativo === false){
+      const dataFormatada = data.dataInicio ? data.dataInicio.split('-').reverse().join('/') : '';
+      statusEl.textContent = 'O controle de ponto começa a valer a partir de ' + dataFormatada + '.';
+      btnEntrada.disabled = true; btnEntrada.textContent = 'Bater entrada';
+      btnSaida.disabled = true; btnSaida.textContent = 'Bater saída';
+      return;
+    }
+
+    const partes = [];
+    if (data.horaEntrada){
+      partes.push('Entrada: ' + data.horaEntrada + ' ✓');
+      btnEntrada.disabled = true; btnEntrada.textContent = 'Entrada ✓';
+    } else {
+      btnEntrada.disabled = false; btnEntrada.textContent = 'Bater entrada';
+    }
+    if (data.horaSaida){
+      partes.push('Saída: ' + data.horaSaida + ' ✓');
+      btnSaida.disabled = true; btnSaida.textContent = 'Saída ✓';
+    } else {
+      btnSaida.disabled = false; btnSaida.textContent = 'Bater saída';
+    }
+    statusEl.textContent = partes.length ? partes.join(' · ') : 'Ainda não bateu ponto hoje.';
+  }catch(err){
+    statusEl.textContent = 'Erro ao carregar o ponto.';
+  }
+}
+
+document.getElementById('btn-ponto-entrada').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-ponto-entrada');
+  btn.disabled = true; btn.textContent = '...';
+  try{
+    const res = await apiPost({ action: 'baterPontoEntrada', colaborador: colaboradorAtual });
+    if (res.ok){
+      toast('Entrada registrada: ' + res.hora);
+      carregarPontoHoje();
+    } else {
+      toast('Erro: ' + (res.erro || 'não foi possível bater ponto'));
+      btn.disabled = false; btn.textContent = 'Bater entrada';
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+    btn.disabled = false; btn.textContent = 'Bater entrada';
+  }
+});
+
+document.getElementById('btn-ponto-saida').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-ponto-saida');
+  btn.disabled = true; btn.textContent = '...';
+  try{
+    const res = await apiPost({ action: 'baterPontoSaida', colaborador: colaboradorAtual });
+    if (res.ok){
+      toast('Saída registrada: ' + res.hora);
+      carregarPontoHoje();
+    } else {
+      toast('Erro: ' + (res.erro || 'não foi possível bater ponto'));
+      btn.disabled = false; btn.textContent = 'Bater saída';
+    }
+  }catch(err){
+    toast('Erro de conexão.');
+    btn.disabled = false; btn.textContent = 'Bater saída';
   }
 });
 </script>
